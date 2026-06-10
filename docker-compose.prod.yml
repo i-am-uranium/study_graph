@@ -29,6 +29,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     command: >
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -46,11 +55,9 @@ services:
     volumes:
       - uploaded_files:/app/storage/uploads
     depends_on:
-      db:
+      api:
         condition: service_healthy
-    command: >
-      sh -c "alembic upgrade head &&
-             python -m app.worker"
+    command: python -m app.worker
 
   frontend:
     build:
@@ -61,7 +68,8 @@ services:
     ports:
       - "${FRONTEND_PORT:-8080}:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   postgres_data:
