@@ -1,0 +1,74 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: studygraph
+      POSTGRES_USER: studygraph
+      POSTGRES_PASSWORD: studygraph
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studygraph -d studygraph"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://studygraph:studygraph@db:5432/studygraph
+      UPLOAD_DIR: /app/storage/uploads
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploaded_files:/app/storage/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  worker:
+    build:
+      context: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://studygraph:studygraph@db:5432/studygraph
+      UPLOAD_DIR: /app/storage/uploads
+    volumes:
+      - uploaded_files:/app/storage/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.worker"
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  uploaded_files:
+  frontend_node_modules:
