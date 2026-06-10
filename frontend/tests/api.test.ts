@@ -15,7 +15,7 @@ describe("apiUrl", () => {
 });
 
 describe("listDocuments", () => {
-  it("requests the document collection", async () => {
+  it("requests the backend document collection in dev mode", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => [],
@@ -23,6 +23,9 @@ describe("listDocuments", () => {
 
     await listDocuments(fetchMock);
 
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/documents"), expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/api/documents",
+      expect.any(Object),
+    );
   });
 });

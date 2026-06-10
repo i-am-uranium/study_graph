@@ -2,7 +2,8 @@ import type { AskResponse, SettingsRead, StudyArtifact, StudyDocument } from "./
 
 type FetchLike = typeof fetch;
 
-const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const DEFAULT_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000" : "");
 
 export function apiUrl(path: string, baseUrl = DEFAULT_BASE_URL): string {
   const cleanBase = baseUrl.replace(/\/$/, "");
