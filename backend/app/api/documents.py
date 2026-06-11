@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import get_db
-from app.models import Document, DocumentChunk
-from app.schemas.documents import DocumentChunkRead, DocumentRead, UploadResponse
-from app.services.ingestion import ingest_document
+from app.models import Document, DocumentChunk, DocumentIngestionJob
+from app.schemas.documents import DocumentChunkRead, DocumentRead, IngestionJobRead, UploadResponse
+from app.services.ingestion import create_ingestion_job
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -48,6 +48,13 @@ def list_documents(db: Session = Depends(get_db)) -> list[Document]:
     return list(db.scalars(select(Document).order_by(Document.created_at.desc())).all())
 
 
+@router.get("/ingestion-jobs", response_model=list[IngestionJobRead])
+def list_ingestion_jobs(db: Session = Depends(get_db)) -> list[DocumentIngestionJob]:
+    return list(
+        db.scalars(select(DocumentIngestionJob).order_by(DocumentIngestionJob.created_at.desc())).all()
+    )
+
+
 @router.get("/{document_id}", response_model=DocumentRead)
 def get_document(document_id: int, db: Session = Depends(get_db)) -> Document:
     document = db.get(Document, document_id)
@@ -75,12 +82,16 @@ def list_chunks(document_id: int, db: Session = Depends(get_db)) -> list[Documen
     ]
 
 
-@router.post("/{document_id}/ingest", response_model=DocumentRead)
-def run_ingestion(document_id: int, db: Session = Depends(get_db)) -> Document:
-    document = ingest_document(db, document_id)
-    if document.status == "failed":
-        raise HTTPException(status_code=400, detail=document.error_message)
-    return document
+@router.post(
+    "/{document_id}/ingest",
+    response_model=IngestionJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def run_ingestion(document_id: int, db: Session = Depends(get_db)) -> DocumentIngestionJob:
+    try:
+        return create_ingestion_job(db, document_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/{document_id}/stats")

@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -45,6 +46,9 @@ def answer_question(
         )
         db.add(session)
         db.flush()
+    else:
+        session.selected_document_ids = document_ids
+        session.updated_at = datetime.now(UTC)
 
     db.add(QaMessage(session_id=session.id, role="user", content=question))
     db.add(

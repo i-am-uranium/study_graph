@@ -18,6 +18,13 @@ class DocumentStatus(StrEnum):
     failed = "failed"
 
 
+class IngestionJobStatus(StrEnum):
+    queued = "queued"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
 class Document(Base):
     __tablename__ = "documents"
 
@@ -35,6 +42,10 @@ class Document(Base):
     )
 
     chunks: Mapped[list["DocumentChunk"]] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
+    ingestion_jobs: Mapped[list["DocumentIngestionJob"]] = relationship(
         back_populates="document",
         cascade="all, delete-orphan",
     )
@@ -63,3 +74,29 @@ class DocumentChunk(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     document: Mapped[Document] = relationship(back_populates="chunks")
+
+
+class DocumentIngestionJob(Base):
+    __tablename__ = "document_ingestion_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        default=IngestionJobStatus.queued.value,
+        index=True,
+    )
+    error_message: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    document: Mapped[Document] = relationship(back_populates="ingestion_jobs")
