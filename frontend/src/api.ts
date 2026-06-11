@@ -1,4 +1,16 @@
-import type { AskResponse, SettingsRead, StudyArtifact, StudyDocument } from "./types";
+import type {
+  AskResponse,
+  IngestionJob,
+  PrintableCreateResponse,
+  PrintableExport,
+  PrintableJob,
+  PrintableSet,
+  QaSession,
+  QaSessionDetail,
+  SettingsRead,
+  StudyArtifact,
+  StudyDocument,
+} from "./types";
 
 type FetchLike = typeof fetch;
 
@@ -48,15 +60,31 @@ export function uploadDocument(file: File): Promise<{ document: StudyDocument }>
   return request("/api/documents", { method: "POST", body: formData });
 }
 
-export function ingestDocument(documentId: number): Promise<StudyDocument> {
+export function ingestDocument(documentId: number): Promise<IngestionJob> {
   return request(`/api/documents/${documentId}/ingest`, { method: "POST" });
 }
 
-export function askQuestion(question: string, documentIds: number[]): Promise<AskResponse> {
+export function listIngestionJobs(fetcher?: FetchLike): Promise<IngestionJob[]> {
+  return request<IngestionJob[]>("/api/documents/ingestion-jobs", {}, fetcher);
+}
+
+export function askQuestion(
+  question: string,
+  documentIds: number[],
+  sessionId?: number | null,
+): Promise<AskResponse> {
   return request("/api/qa/ask", {
     method: "POST",
-    body: JSON.stringify({ question, document_ids: documentIds }),
+    body: JSON.stringify({ question, document_ids: documentIds, session_id: sessionId ?? null }),
   });
+}
+
+export function listQaSessions(): Promise<QaSession[]> {
+  return request("/api/qa/sessions");
+}
+
+export function getQaSession(sessionId: number): Promise<QaSessionDetail> {
+  return request(`/api/qa/sessions/${sessionId}`);
 }
 
 export function createSummary(documentId: number): Promise<StudyArtifact> {
@@ -79,4 +107,49 @@ export function listArtifacts(): Promise<StudyArtifact[]> {
 
 export function readSettings(): Promise<SettingsRead> {
   return request("/api/settings");
+}
+
+export function listPrintables(fetcher?: FetchLike): Promise<PrintableSet[]> {
+  return request<PrintableSet[]>("/api/printables", {}, fetcher);
+}
+
+export function listPrintableJobs(fetcher?: FetchLike): Promise<PrintableJob[]> {
+  return request<PrintableJob[]>("/api/printables/jobs", {}, fetcher);
+}
+
+export function createPrintable(payload: {
+  document_id: number;
+  title: string;
+  output_type: string;
+  template: string;
+  config: Record<string, unknown>;
+}): Promise<PrintableCreateResponse> {
+  return request("/api/printables", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updatePrintable(
+  printableId: number,
+  payload: Record<string, unknown>,
+): Promise<PrintableSet> {
+  return request(`/api/printables/${printableId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function exportPrintable(printableId: number, exportType = "teacher_pack"): Promise<PrintableJob> {
+  return request(`/api/printables/${printableId}/export`, {
+    method: "POST",
+    body: JSON.stringify({ export_type: exportType }),
+  });
+}
+
+export function listPrintableExports(
+  printableId: number,
+  fetcher?: FetchLike,
+): Promise<PrintableExport[]> {
+  return request<PrintableExport[]>(`/api/printables/${printableId}/exports`, {}, fetcher);
 }

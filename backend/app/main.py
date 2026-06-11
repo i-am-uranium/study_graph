@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import documents, qa, settings, study
+from app.api import documents, printables, qa, settings, study
 from app.core.config import get_settings
 
 
@@ -25,6 +25,7 @@ def create_app() -> FastAPI:
     app.include_router(documents.router)
     app.include_router(qa.router)
     app.include_router(study.router)
+    app.include_router(printables.router)
     return app
 
 
