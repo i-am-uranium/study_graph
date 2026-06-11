@@ -38,11 +38,16 @@ The app is designed for local development first while remaining deployable in pr
 
 The API is available at `http://localhost:8000`.
 
+If a document fails with `Provider API key is not configured`, set `OPENAI_API_KEY`
+in `.env`, restart the API and worker, then run ingestion again for that document.
+
 ## Development Without Docker
 
 Backend:
 
 ```bash
+cp .env.example .env
+# edit .env and set OPENAI_API_KEY
 cd backend
 python -m venv .venv
 source .venv/bin/activate
@@ -57,6 +62,10 @@ cd backend
 source .venv/bin/activate
 python -m app.worker
 ```
+
+When the backend and worker are started from `backend/`, StudyGraph still reads the
+root `.env`. You can also export provider variables in the terminal before starting
+both processes.
 
 Frontend:
 

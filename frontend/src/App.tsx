@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   BookOpen,
   FileText,
   HelpCircle,
@@ -83,6 +84,10 @@ export default function App() {
   }
 
   async function onIngest(documentId: number) {
+    if (!settings?.api_key_configured) {
+      setError("Set OPENAI_API_KEY in .env and restart the API and worker before ingestion.");
+      return;
+    }
     setBusy(`ingest-${documentId}`);
     setError(null);
     try {
@@ -99,6 +104,10 @@ export default function App() {
   async function onAsk(event: FormEvent) {
     event.preventDefault();
     if (!question.trim()) return;
+    if (!settings?.api_key_configured) {
+      setError("Set OPENAI_API_KEY in .env and restart the API and worker before asking questions.");
+      return;
+    }
     setBusy("ask");
     setError(null);
     try {
@@ -111,6 +120,12 @@ export default function App() {
   }
 
   async function onArtifact(kind: "summary" | "flashcards", documentId: number) {
+    if (!settings?.api_key_configured) {
+      setError(
+        "Set OPENAI_API_KEY in .env and restart the API and worker before generating study artifacts.",
+      );
+      return;
+    }
     setBusy(`${kind}-${documentId}`);
     setError(null);
     try {
@@ -129,6 +144,9 @@ export default function App() {
     () => documents.filter((document) => document.status === "ready"),
     [documents],
   );
+  const providerReady = settings?.api_key_configured === true;
+  const providerMissing = settings !== null && !providerReady;
+  const providerSetupMessage = "Set OPENAI_API_KEY in .env and restart the API and worker.";
 
   return (
     <div className="appShell">
@@ -170,6 +188,16 @@ export default function App() {
 
         {error ? <div className="alert">{error}</div> : null}
 
+        {providerMissing ? (
+          <div className="setupWarning">
+            <AlertTriangle size={18} />
+            <div>
+              <strong>Provider key missing</strong>
+              <span>{providerSetupMessage}</span>
+            </div>
+          </div>
+        ) : null}
+
         {activeTab === "library" ? (
           <section className="panel">
             <div className="panelHeader">
@@ -202,19 +230,30 @@ export default function App() {
                   <div className="actions">
                     <button
                       onClick={() => void onIngest(document.id)}
-                      disabled={busy === `ingest-${document.id}`}
+                      disabled={!providerReady || busy === `ingest-${document.id}`}
+                      title={!providerReady ? providerSetupMessage : "Ingest document"}
                     >
                       {busy === `ingest-${document.id}` ? "Ingesting" : "Ingest"}
                     </button>
                     <button
                       onClick={() => void onArtifact("summary", document.id)}
-                      disabled={document.status !== "ready" || busy === `summary-${document.id}`}
+                      disabled={
+                        !providerReady ||
+                        document.status !== "ready" ||
+                        busy === `summary-${document.id}`
+                      }
+                      title={!providerReady ? providerSetupMessage : "Generate summary"}
                     >
                       Summary
                     </button>
                     <button
                       onClick={() => void onArtifact("flashcards", document.id)}
-                      disabled={document.status !== "ready" || busy === `flashcards-${document.id}`}
+                      disabled={
+                        !providerReady ||
+                        document.status !== "ready" ||
+                        busy === `flashcards-${document.id}`
+                      }
+                      title={!providerReady ? providerSetupMessage : "Generate flashcards"}
                     >
                       Flashcards
                     </button>
@@ -260,7 +299,10 @@ export default function App() {
                 onChange={(event) => setQuestion(event.target.value)}
                 placeholder="Ask a question about your uploaded material..."
               />
-              <button disabled={busy === "ask" || !question.trim()}>
+              <button
+                disabled={!providerReady || busy === "ask" || !question.trim()}
+                title={!providerReady ? providerSetupMessage : "Ask StudyGraph"}
+              >
                 {busy === "ask" ? "Thinking" : "Ask StudyGraph"}
               </button>
             </form>
@@ -332,12 +374,14 @@ export default function App() {
                 <dt>Embedding model</dt>
                 <dd>{settings?.embedding_model ?? "Unknown"}</dd>
                 <dt>API key</dt>
-                <dd>{settings?.api_key_configured ? "Configured" : "Missing"}</dd>
+                <dd className={settings?.api_key_configured ? "configured" : "missing"}>
+                  {settings?.api_key_configured ? "Configured" : "Missing"}
+                </dd>
               </dl>
             </div>
             <div className="settingsNote">
-              Configure provider credentials through `.env` before starting the API. Secrets are not
-              stored in the frontend.
+              Configure provider credentials through `.env` before starting the API and worker.
+              Secrets are not stored in the frontend.
             </div>
           </section>
         ) : null}

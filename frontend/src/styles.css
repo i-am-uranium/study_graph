@@ -152,6 +152,27 @@ nav button:hover {
   margin-bottom: 16px;
 }
 
+.setupWarning {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid #e7c66b;
+  background: #fff8e1;
+  color: #59430b;
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.setupWarning div {
+  display: grid;
+  gap: 2px;
+}
+
+.setupWarning span {
+  color: #6d5617;
+}
+
 .uploadButton {
   position: relative;
   background: #1f6f5f;
@@ -318,6 +339,16 @@ dt {
 dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.configured {
+  color: #1d6b43;
+  font-weight: 700;
+}
+
+.missing {
+  color: #923b21;
+  font-weight: 700;
 }
 
 .settingsNote {

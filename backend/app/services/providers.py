@@ -28,7 +28,10 @@ class OpenAICompatibleProvider:
 
     def ensure_configured(self) -> None:
         if not self.settings.api_key:
-            raise ValueError("Provider API key is not configured")
+            raise ValueError(
+                "Provider API key is not configured. "
+                "Set OPENAI_API_KEY in .env and restart the API and worker."
+            )
 
     def chat_payload(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
         return {

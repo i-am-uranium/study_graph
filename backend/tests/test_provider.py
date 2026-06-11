@@ -13,7 +13,8 @@ def test_provider_settings_require_api_key_for_real_calls() -> None:
     try:
         provider.ensure_configured()
     except ValueError as exc:
-        assert "API key" in str(exc)
+        assert "OPENAI_API_KEY" in str(exc)
+        assert "restart the API and worker" in str(exc)
     else:
         raise AssertionError("expected ValueError")
 

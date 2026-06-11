@@ -25,7 +25,7 @@ Use any OpenAI-compatible provider that supports `/chat/completions` and `/embed
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-The API container runs Alembic migrations before starting. The worker container also runs migrations before polling queued documents.
+The API container runs Alembic migrations before starting. The worker waits for the API health check, then polls queued documents.
 
 ## Reverse Proxy
 
@@ -60,8 +60,8 @@ Also snapshot or copy the `uploaded_files` Docker volume.
 ## Operational Notes
 
 - Keep `OPENAI_API_KEY` only in `.env` or your secret manager.
+- Restart both the API and worker after changing provider credentials. Failed documents can be ingested again after credentials are fixed.
 - Do not expose the API service directly unless you also configure CORS and authentication for your deployment.
 - v0.1 is designed for single-tenant or trusted deployments. Classroom multi-user roles are planned in the roadmap.
 - Embedding dimensions must match the configured embedding model before data is ingested.
 - For larger libraries, tune Postgres memory and pgvector index settings.
-
