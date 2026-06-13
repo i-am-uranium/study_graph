@@ -26,6 +26,7 @@
   --radius: 8px;
   --radius-lg: 12px;
   --nav-width: 260px;
+  --app-font-scale: 1;
   color: var(--ink);
   background: var(--bg);
   font-family: var(--font-sans);
@@ -110,6 +111,62 @@ label[role="button"]:focus-visible {
   color-scheme: dark;
 }
 
+.text-comfortable {
+  --app-font-scale: 1.06;
+}
+
+.text-large {
+  --app-font-scale: 1.12;
+}
+
+.contrast-high {
+  --bg: #f7faf8;
+  --bg-strong: #e1ede6;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-soft: #eef6f1;
+  --ink: #08110e;
+  --ink-soft: #15241f;
+  --muted: #33453d;
+  --muted-strong: #1f332b;
+  --line: #7d978b;
+  --line-strong: #42584f;
+  --primary: #004d3f;
+  --primary-strong: #00372e;
+  --primary-soft: #cbeedd;
+  --accent: #9a6b00;
+  --accent-soft: #fff1b5;
+  --danger: #8f1d0e;
+  --danger-soft: #ffe1d8;
+  --warning: #604000;
+  --warning-soft: #ffeaa1;
+  --shadow: 0 0 0 1px var(--line);
+  --shadow-soft: 0 0 0 1px var(--line);
+}
+
+.theme-dark.contrast-high {
+  --bg: #050807;
+  --bg-strong: #0a110e;
+  --surface: #101814;
+  --surface-raised: #121d18;
+  --surface-soft: #18261f;
+  --ink: #ffffff;
+  --ink-soft: #eef7f2;
+  --muted: #d2e1da;
+  --muted-strong: #edf7f1;
+  --line: #9ab0a6;
+  --line-strong: #c8d7d0;
+  --primary: #8ff0d1;
+  --primary-strong: #c0ffeb;
+  --primary-soft: #113d32;
+  --accent: #ffd85f;
+  --accent-soft: #4a3900;
+  --danger: #ffb39f;
+  --danger-soft: #4a1008;
+  --warning: #ffe084;
+  --warning-soft: #443200;
+}
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -192,6 +249,7 @@ label[role="button"]:focus-visible {
   min-width: 0;
   padding: clamp(18px, 3vw, 34px);
   overflow: auto;
+  font-size: calc(1rem * var(--app-font-scale));
 }
 
 .workspaceHero {
@@ -237,6 +295,33 @@ label[role="button"]:focus-visible {
   align-items: center;
 }
 
+.personaSwitch {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  padding: 4px;
+  box-shadow: var(--shadow-soft);
+}
+
+.personaSwitch button {
+  min-height: 36px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-strong);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.personaSwitch button.active,
+.personaSwitch button[aria-pressed="true"] {
+  background: var(--primary);
+  color: #ffffff;
+}
+
 .iconButton {
   width: 44px;
   padding: 0;
@@ -244,6 +329,147 @@ label[role="button"]:focus-visible {
   color: var(--ink);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-soft);
+}
+
+.studioDesk {
+  display: grid;
+  gap: 16px;
+}
+
+.deskHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(240px, 0.65fr);
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--primary-soft) 76%, var(--surface-raised)), var(--surface-raised)),
+    var(--surface-raised);
+  padding: clamp(20px, 3vw, 30px);
+  box-shadow: var(--shadow-soft);
+}
+
+.deskHero h3 {
+  max-width: 15ch;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(32px, 4vw, 54px);
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+
+.deskHero p {
+  max-width: 66ch;
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.deskStatus {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface-raised) 88%, var(--accent-soft));
+  padding: 14px;
+}
+
+.deskStatus strong {
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.deskStatus p {
+  margin: 0;
+}
+
+.deskActions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.deskActions button {
+  display: inline-flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-weight: 800;
+  box-shadow: var(--shadow-soft);
+}
+
+.deskActions button:first-child {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.previewPanel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  padding: 20px;
+  box-shadow: var(--shadow-soft);
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.previewCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface-soft) 70%, var(--surface-raised));
+  padding: 14px;
+}
+
+.previewIcon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface-raised));
+  color: var(--warning);
+}
+
+.previewStatus {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 24px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--muted-strong);
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.previewCard h4 {
+  margin: 8px 0 4px;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.previewCard p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .workspaceMetrics {
@@ -1196,6 +1422,14 @@ dd {
   .workspaceMetrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .deskHero {
+    grid-template-columns: 1fr;
+  }
+
+  .deskActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -1282,6 +1516,33 @@ dd {
 
   .workspaceIntro h2 {
     font-size: 34px;
+  }
+
+  .topbarActions {
+    width: 100%;
+  }
+
+  .personaSwitch {
+    width: 100%;
+  }
+
+  .personaSwitch button {
+    flex: 1;
+  }
+
+  .deskHero h3 {
+    max-width: none;
+    font-size: 34px;
+  }
+
+  .deskActions,
+  .previewGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .deskActions button {
+    justify-content: flex-start;
+    padding: 0 14px;
   }
 
   .workspaceMetrics {

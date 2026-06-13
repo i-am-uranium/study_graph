@@ -1,17 +1,21 @@
 import {
   Activity,
+  Accessibility,
   AlertTriangle,
+  BarChart3,
   BookOpen,
   CheckCircle2,
   ClipboardList,
   Clock3,
   FileStack,
   FileText,
+  GraduationCap,
   HelpCircle,
   Layers,
   Loader2,
   Moon,
   Network,
+  PlugZap,
   Plus,
   RefreshCcw,
   Send,
@@ -19,7 +23,9 @@ import {
   ShieldCheck,
   Sparkles,
   Sun,
+  Type,
   Upload,
+  Users,
   X,
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
@@ -58,9 +64,11 @@ import type {
   StudyDocument,
 } from "./types";
 
-type Tab = "library" | "ask" | "study" | "printables" | "settings";
+type Tab = "desk" | "rag" | "study" | "printables" | "settings";
 type ArtifactKind = "summary" | "flashcards";
 type AppTheme = "light" | "dark";
+type UserPersona = "student" | "teacher" | "admin";
+type TextScale = "standard" | "comfortable" | "large";
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -70,11 +78,50 @@ type ChatMessage = {
 };
 
 const tabs: Array<{ id: Tab; label: string; icon: typeof FileText }> = [
-  { id: "library", label: "Library", icon: FileText },
-  { id: "ask", label: "Ask", icon: HelpCircle },
-  { id: "study", label: "Study Set", icon: Layers },
+  { id: "desk", label: "Study Desk", icon: GraduationCap },
+  { id: "rag", label: "RAG Library", icon: HelpCircle },
+  { id: "study", label: "Study Artifacts", icon: Layers },
   { id: "printables", label: "Paper Builder", icon: ClipboardList },
   { id: "settings", label: "Settings", icon: Settings },
+];
+
+const personas: Array<{ id: UserPersona; label: string }> = [
+  { id: "student", label: "Student" },
+  { id: "teacher", label: "Teacher" },
+  { id: "admin", label: "Admin" },
+];
+
+const previewModules = [
+  {
+    title: "Collaboration",
+    status: "Requires API",
+    icon: Users,
+    description: "Live rooms, chat, and whiteboard will need WebSocket-backed workspace APIs.",
+  },
+  {
+    title: "Assignments",
+    status: "Planned",
+    icon: ClipboardList,
+    description: "Rubrics, submissions, and AI feedback stay preview-only until assignment APIs exist.",
+  },
+  {
+    title: "Analytics",
+    status: "Preview",
+    icon: BarChart3,
+    description: "Progress dashboards can use real learning events after server metrics are added.",
+  },
+  {
+    title: "Integrations",
+    status: "Planned",
+    icon: PlugZap,
+    description: "Classroom and LMS sync controls remain non-operative in this adapter-first pass.",
+  },
+  {
+    title: "Offline Sync",
+    status: "Planned",
+    icon: Network,
+    description: "Local queues and cloud conflict handling need a dedicated sync API design.",
+  },
 ];
 
 function artifactKey(documentId: number, kind: ArtifactKind) {
@@ -106,7 +153,7 @@ function pluralize(count: number, singular: string, plural = `${singular}s`) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>("library");
+  const [activeTab, setActiveTab] = useState<Tab>("desk");
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
   const [ingestionJobs, setIngestionJobs] = useState<IngestionJob[]>([]);
   const [artifacts, setArtifacts] = useState<StudyArtifact[]>([]);
@@ -118,6 +165,9 @@ export default function App() {
   const [activeMessages, setActiveMessages] = useState<ChatMessage[]>([]);
   const [readerArtifactId, setReaderArtifactId] = useState<number | null>(null);
   const [appTheme, setAppTheme] = useState<AppTheme>("light");
+  const [persona, setPersona] = useState<UserPersona>("teacher");
+  const [highContrast, setHighContrast] = useState(false);
+  const [textScale, setTextScale] = useState<TextScale>("standard");
   const [settings, setSettings] = useState<SettingsRead | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [question, setQuestion] = useState("");
@@ -140,7 +190,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "ask" || activeSessionId === null) return;
+    if (activeTab !== "rag" || activeSessionId === null) return;
     void loadQaSession(activeSessionId);
   }, [activeTab, activeSessionId]);
 
@@ -343,6 +393,12 @@ export default function App() {
     setAppTheme((current) => (current === "light" ? "dark" : "light"));
   }
 
+  function cycleTextScale() {
+    setTextScale((current) =>
+      current === "standard" ? "comfortable" : current === "comfortable" ? "large" : "standard",
+    );
+  }
+
   async function onArtifact(kind: ArtifactKind, documentId: number) {
     const existingArtifact = artifactByDocumentAndType.get(artifactKey(documentId, kind));
     if (existingArtifact) {
@@ -519,6 +575,7 @@ export default function App() {
   const providerSetupMessage = "Set OPENAI_API_KEY in .env and restart the API and worker.";
 
   const themeToggleLabel = appTheme === "light" ? "Dark mode" : "Light mode";
+  const contrastToggleLabel = highContrast ? "Standard contrast" : "High contrast";
   const pendingDocumentCount = documents.filter(
     (document) => document.status === "queued" || document.status === "ingesting",
   ).length;
@@ -536,18 +593,20 @@ export default function App() {
       ? "Upload a source"
       : readyDocuments.length === 0
         ? "Ingest queued sources"
-        : activeTab === "library"
+        : activeTab === "rag"
           ? "Ask, summarize, or build a paper"
-          : activeTab === "ask"
-            ? "Ask with cited evidence"
-            : activeTab === "study"
-              ? "Review saved artifacts"
-              : activeTab === "printables"
-                ? "Generate or review a paper"
+          : activeTab === "study"
+            ? "Review saved artifacts"
+            : activeTab === "printables"
+              ? "Generate or review a paper"
+              : activeTab === "desk"
+                ? "Choose a working flow"
                 : "Check local setup";
 
   return (
-    <div className={`appShell theme-${appTheme}`}>
+    <div
+      className={`appShell theme-${appTheme} text-${textScale}${highContrast ? " contrast-high" : ""}`}
+    >
       <aside className="sidebar">
         <div className="brand">
           <img src="/studygraph-mark.svg" alt="" aria-hidden="true" />
@@ -565,9 +624,9 @@ export default function App() {
                 className={activeTab === tab.id ? "active" : ""}
                 aria-label={tab.label}
                 title={tab.label}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  if (tab.id !== "study") {
+              onClick={() => {
+                setActiveTab(tab.id);
+                if (tab.id !== "study") {
                     setReaderArtifactId(null);
                   }
                 }}
@@ -591,6 +650,36 @@ export default function App() {
             </p>
           </div>
           <div className="topbarActions">
+            <div className="personaSwitch" aria-label="Workspace persona">
+              {personas.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-label={`${item.label} view`}
+                  aria-pressed={persona === item.id}
+                  className={persona === item.id ? "active" : ""}
+                  onClick={() => setPersona(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <button
+              className="iconButton"
+              onClick={() => setHighContrast((current) => !current)}
+              aria-label={contrastToggleLabel}
+              title={contrastToggleLabel}
+            >
+              <Accessibility size={18} />
+            </button>
+            <button
+              className="iconButton"
+              onClick={cycleTextScale}
+              aria-label="Text size"
+              title={`Text size: ${textScale}`}
+            >
+              <Type size={18} />
+            </button>
             <button
               className="iconButton"
               onClick={toggleAppTheme}
@@ -656,7 +745,79 @@ export default function App() {
         <div className="workspaceGrid">
           <div className="workspacePrimary">
 
-        {activeTab === "library" ? (
+        {activeTab === "desk" ? (
+          <section className="studioDesk">
+            <div className="deskHero">
+              <div>
+                <p className="eyebrow">Clean Study OS</p>
+                <h3>Learning workspace for {persona}s</h3>
+                <p>
+                  Work from trusted source material, generate grounded study outputs, and keep future
+                  platform modules visible without pretending they are already wired.
+                </p>
+              </div>
+              <div className="deskStatus">
+                <span className={providerReady ? "status ready" : "status failed"}>
+                  {providerReady ? "Provider ready" : "Provider missing"}
+                </span>
+                <strong>{nextAction}</strong>
+                <p>
+                  {readyDocuments.length > 0
+                    ? `${readyDocuments.length} ready source${readyDocuments.length === 1 ? "" : "s"} can power RAG, artifacts, and paper drafts.`
+                    : "Upload and ingest a source to unlock the working study flows."}
+                </p>
+              </div>
+            </div>
+
+            <div className="deskActions" aria-label="Workspace quick actions">
+              <button onClick={() => setActiveTab("rag")}>
+                <Upload size={18} />
+                Upload source
+              </button>
+              <button onClick={() => setActiveTab("rag")}>
+                <HelpCircle size={18} />
+                Ask with citations
+              </button>
+              <button onClick={() => setActiveTab("study")}>
+                <Layers size={18} />
+                Review artifacts
+              </button>
+              <button onClick={() => setActiveTab("printables")}>
+                <ClipboardList size={18} />
+                Build paper
+              </button>
+            </div>
+
+            <section className="previewPanel" aria-label="Platform previews">
+              <div className="panelHeader">
+                <div>
+                  <h3>Platform previews</h3>
+                  <p>Visible roadmap surfaces borrowed from the reference app. These do not call APIs yet.</p>
+                </div>
+              </div>
+              <div className="previewGrid">
+                {previewModules.map((module) => {
+                  const Icon = module.icon;
+                  return (
+                    <article key={module.title} className="previewCard">
+                      <div className="previewIcon">
+                        <Icon size={18} />
+                      </div>
+                      <div>
+                        <span className="previewStatus">{module.status}</span>
+                        <h4>{module.title}</h4>
+                        <p>{module.description}</p>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          </section>
+        ) : null}
+
+        {activeTab === "rag" ? (
+          <>
           <section className="panel">
             <div className="panelHeader">
               <div>
@@ -742,7 +903,7 @@ export default function App() {
                         }
                         title={
                           summaryArtifact
-                            ? "Open summary in Study Set"
+                            ? "Open summary in Study Artifacts"
                             : !providerReady
                               ? providerSetupMessage
                               : "Generate summary"
@@ -758,7 +919,7 @@ export default function App() {
                         }
                         title={
                           flashcardsArtifact
-                            ? "Open flashcards in Study Set"
+                            ? "Open flashcards in Study Artifacts"
                             : !providerReady
                               ? providerSetupMessage
                               : "Generate flashcards"
@@ -779,9 +940,7 @@ export default function App() {
               ) : null}
             </div>
           </section>
-        ) : null}
 
-        {activeTab === "ask" ? (
           <section className="panel askPanel">
             <aside className="conversationList" aria-label="Saved conversations">
               <div className="conversationListHeader">
@@ -912,6 +1071,7 @@ export default function App() {
               </form>
             </div>
           </section>
+          </>
         ) : null}
 
         {activeTab === "study" ? (

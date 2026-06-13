@@ -324,7 +324,7 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Ask" }));
+    fireEvent.click(await screen.findByRole("button", { name: "RAG Library" }));
     const textbox = await screen.findByPlaceholderText("Ask a follow-up about your study material...");
     fireEvent.change(textbox, { target: { value: "What does gravity do?" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
@@ -346,6 +346,38 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Light mode" })).toBeInTheDocument();
   });
 
+  it("opens on the adapter-first Study Desk with persona controls and preview modules", async () => {
+    stubApi(true);
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: "Study Desk" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Student view" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Teacher view" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Admin view" })).toBeInTheDocument();
+    expect(screen.getByText("Platform previews")).toBeInTheDocument();
+    expect(screen.getByText("Collaboration")).toBeInTheDocument();
+    expect(screen.getByText("Assignments")).toBeInTheDocument();
+    expect(screen.getAllByText("Requires API").length).toBeGreaterThan(0);
+  });
+
+  it("toggles high contrast and cycles text scale without backend calls", async () => {
+    const fetchMock = stubApi(true);
+    const { container } = render(<App />);
+
+    expect(await screen.findByText("StudyGraph")).toBeInTheDocument();
+    const initialCallCount = fetchMock.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "High contrast" }));
+    expect(container.querySelector(".appShell")).toHaveClass("contrast-high");
+
+    fireEvent.click(screen.getByRole("button", { name: "Text size" }));
+    expect(container.querySelector(".appShell")).toHaveClass("text-comfortable");
+    expect(fetchMock.mock.calls).toHaveLength(initialCallCount);
+  });
+
   it("disables ingestion when a document is already ready", async () => {
     stubApi(true, {
       documents: [
@@ -362,7 +394,8 @@ describe("App", () => {
     });
     render(<App />);
 
-    expect(await screen.findByText("production_rag_quiz.pdf")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "RAG Library" }));
+    expect((await screen.findAllByText("production_rag_quiz.pdf")).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Ingest" })).toBeDisabled();
   });
 
@@ -382,6 +415,7 @@ describe("App", () => {
     });
     render(<App />);
 
+    fireEvent.click(await screen.findByRole("button", { name: "RAG Library" }));
     fireEvent.click(await screen.findByRole("button", { name: "Ingest" }));
 
     expect(await screen.findByText("Job #42 · queued")).toBeInTheDocument();
@@ -424,6 +458,7 @@ describe("App", () => {
     });
     render(<App />);
 
+    fireEvent.click(await screen.findByRole("button", { name: "RAG Library" }));
     expect(await screen.findByText("Job #41 · running")).toBeInTheDocument();
     await waitFor(() => {
       expect(
@@ -476,9 +511,10 @@ describe("App", () => {
     });
     render(<App />);
 
+    fireEvent.click(await screen.findByRole("button", { name: "RAG Library" }));
     const summaryButton = await screen.findByRole("button", { name: "Summary" });
     await waitFor(() =>
-      expect(summaryButton).toHaveAttribute("title", "Open summary in Study Set"),
+      expect(summaryButton).toHaveAttribute("title", "Open summary in Study Artifacts"),
     );
     fireEvent.click(summaryButton);
 
@@ -520,9 +556,10 @@ describe("App", () => {
     });
     render(<App />);
 
+    fireEvent.click(await screen.findByRole("button", { name: "RAG Library" }));
     const flashcardsButton = await screen.findByRole("button", { name: "Flashcards" });
     await waitFor(() =>
-      expect(flashcardsButton).toHaveAttribute("title", "Open flashcards in Study Set"),
+      expect(flashcardsButton).toHaveAttribute("title", "Open flashcards in Study Artifacts"),
     );
     fireEvent.click(flashcardsButton);
 
@@ -582,7 +619,7 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Ask" }));
+    fireEvent.click(await screen.findByRole("button", { name: "RAG Library" }));
 
     expect(await screen.findByText("What is RAG?")).toBeInTheDocument();
     expect(screen.getAllByText("RAG uses retrieval to ground answers.").length).toBeGreaterThan(0);
@@ -634,7 +671,7 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Ask" }));
+    fireEvent.click(await screen.findByRole("button", { name: "RAG Library" }));
 
     expect(await screen.findByText("Retrieval of Evidence:")).toHaveProperty("tagName", "STRONG");
     expect(screen.getByText("Hybrid Search:")).toHaveProperty("tagName", "STRONG");
@@ -695,7 +732,7 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Ask" }));
+    fireEvent.click(await screen.findByRole("button", { name: "RAG Library" }));
     const textbox = await screen.findByPlaceholderText("Ask a follow-up about your study material...");
     fireEvent.change(textbox, { target: { value: "What is hybrid search?" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
@@ -731,7 +768,7 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Study Set" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Study Artifacts" }));
     fireEvent.click(await screen.findByRole("button", { name: "Open reader for Retrieval notes" }));
 
     const reader = await screen.findByRole("region", { name: "Reader mode" });
@@ -762,7 +799,7 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Dark mode" }));
-    fireEvent.click(screen.getByRole("button", { name: "Study Set" }));
+    fireEvent.click(screen.getByRole("button", { name: "Study Artifacts" }));
     fireEvent.click(await screen.findByRole("button", { name: "Open reader for Dark reader notes" }));
 
     expect(await screen.findByRole("region", { name: "Reader mode" })).toHaveClass("dark");
@@ -785,7 +822,7 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Study Set" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Study Artifacts" }));
     fireEvent.click(await screen.findByRole("button", { name: "Open reader for RAG cards" }));
 
     expect(await screen.findByRole("region", { name: "Reader mode" })).toBeInTheDocument();
