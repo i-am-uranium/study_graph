@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="StudyGraph app icon">
+  <rect width="512" height="512" rx="108" fill="#eef4f1"/>
+  <rect x="72" y="72" width="368" height="368" rx="88" fill="#17211e"/>
+  <path d="M130 168c0-38.66 31.34-70 70-70h86v316h-86c-38.66 0-70-31.34-70-70V168Z" fill="#f6f1df"/>
+  <path d="M276 98h70c38.66 0 70 31.34 70 70v176c0 38.66-31.34 70-70 70h-70V98Z" fill="#dce9e2"/>
+  <path d="M276 112v288" stroke="#17211e" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="222" cy="242" r="28" fill="#1f6f5f"/>
+  <circle cx="332" cy="214" r="28" fill="#f0c95a"/>
+  <circle cx="336" cy="318" r="28" fill="#c9533d"/>
+  <path d="M249 238 304 222M249 256 309 302" stroke="#17211e" stroke-width="18" stroke-linecap="round"/>
+</svg>

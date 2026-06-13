@@ -1,16 +1,22 @@
 import {
+  Activity,
   AlertTriangle,
   BookOpen,
+  CheckCircle2,
   ClipboardList,
+  Clock3,
+  FileStack,
   FileText,
   HelpCircle,
   Layers,
   Loader2,
   Moon,
+  Network,
   Plus,
   RefreshCcw,
   Send,
   Settings,
+  ShieldCheck,
   Sparkles,
   Sun,
   Upload,
@@ -93,6 +99,10 @@ function hasPrintableSections(
 
 function printableJobLabel(job: PrintableJob): string {
   return `Job #${job.id} · ${job.job_type.replace("_", " ")} · ${job.status}`;
+}
+
+function pluralize(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 export default function App() {
@@ -509,24 +519,52 @@ export default function App() {
   const providerSetupMessage = "Set OPENAI_API_KEY in .env and restart the API and worker.";
 
   const themeToggleLabel = appTheme === "light" ? "Dark mode" : "Light mode";
+  const pendingDocumentCount = documents.filter(
+    (document) => document.status === "queued" || document.status === "ingesting",
+  ).length;
+  const failedDocumentCount = documents.filter((document) => document.status === "failed").length;
+  const runningPrintableCount = printables.filter(
+    (printable) => printable.status === "generating" || printable.status === "exporting",
+  ).length;
+  const draftPrintableCount = printables.filter(
+    (printable) => printable.status === "draft_ready" || printable.status === "export_ready",
+  ).length;
+  const activeTabLabel = tabs.find((tab) => tab.id === activeTab)?.label ?? "Workspace";
+  const nextAction = !providerReady
+    ? "Connect provider credentials"
+    : documents.length === 0
+      ? "Upload a source"
+      : readyDocuments.length === 0
+        ? "Ingest queued sources"
+        : activeTab === "library"
+          ? "Ask, summarize, or build a paper"
+          : activeTab === "ask"
+            ? "Ask with cited evidence"
+            : activeTab === "study"
+              ? "Review saved artifacts"
+              : activeTab === "printables"
+                ? "Generate or review a paper"
+                : "Check local setup";
 
   return (
     <div className={`appShell theme-${appTheme}`}>
       <aside className="sidebar">
         <div className="brand">
-          <BookOpen size={28} />
+          <img src="/studygraph-mark.svg" alt="" aria-hidden="true" />
           <div>
             <h1>StudyGraph</h1>
-            <span>Local study RAG</span>
+            <span>Hybrid learning studio</span>
           </div>
         </div>
-        <nav>
+        <nav className="appNav" aria-label="Primary workspace">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 className={activeTab === tab.id ? "active" : ""}
+                aria-label={tab.label}
+                title={tab.label}
                 onClick={() => {
                   setActiveTab(tab.id);
                   if (tab.id !== "study") {
@@ -535,7 +573,7 @@ export default function App() {
                 }}
               >
                 <Icon size={18} />
-                {tab.label}
+                <span>{tab.label}</span>
               </button>
             );
           })}
@@ -543,10 +581,14 @@ export default function App() {
       </aside>
 
       <main className="workspace">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Study workspace</p>
-            <h2>{tabs.find((tab) => tab.id === activeTab)?.label}</h2>
+        <header className="workspaceHero">
+          <div className="workspaceIntro">
+            <p className="eyebrow">Learning Workspace</p>
+            <h2>{activeTabLabel}</h2>
+            <p>
+              Turn source material into cited answers, study artifacts, and reviewable classroom
+              papers.
+            </p>
           </div>
           <div className="topbarActions">
             <button
@@ -568,6 +610,37 @@ export default function App() {
           </div>
         </header>
 
+        <section className="workspaceMetrics" aria-label="Workspace source status">
+          <article className="metricCard strong">
+            <CheckCircle2 size={18} />
+            <div>
+              <strong>{pluralize(readyDocuments.length, "ready")}</strong>
+              <span>Sources searchable</span>
+            </div>
+          </article>
+          <article className="metricCard">
+            <Clock3 size={18} />
+            <div>
+              <strong>{pluralize(pendingDocumentCount, "pending")}</strong>
+              <span>Ingestion work</span>
+            </div>
+          </article>
+          <article className="metricCard">
+            <FileStack size={18} />
+            <div>
+              <strong>{pluralize(artifacts.length, "artifact")}</strong>
+              <span>Study outputs</span>
+            </div>
+          </article>
+          <article className="metricCard">
+            <ClipboardList size={18} />
+            <div>
+              <strong>{pluralize(draftPrintableCount, "paper draft")}</strong>
+              <span>{runningPrintableCount > 0 ? `${runningPrintableCount} running` : nextAction}</span>
+            </div>
+          </article>
+        </section>
+
         {error ? <div className="alert">{error}</div> : null}
 
         {providerMissing ? (
@@ -579,6 +652,9 @@ export default function App() {
             </div>
           </div>
         ) : null}
+
+        <div className="workspaceGrid">
+          <div className="workspacePrimary">
 
         {activeTab === "library" ? (
           <section className="panel">
@@ -772,7 +848,15 @@ export default function App() {
                       <p>{message.content}</p>
                     )}
                     {message.citations.length > 0 ? (
-                      <div className="citationList compact">
+                      <div className="citationLens">
+                        <div className="citationLensHeader">
+                          <Network size={16} />
+                          <div>
+                            <strong>Citation Lens</strong>
+                            <span>{pluralize(message.citations.length, "source")} inspected</span>
+                          </div>
+                        </div>
+                        <div className="citationList compact">
                         {message.citations.map((citation, index) => (
                           <article key={index} className="citation">
                             <strong>{String(citation.filename || "Source")}</strong>
@@ -785,6 +869,14 @@ export default function App() {
                             {citation.text ? <p>{String(citation.text)}</p> : null}
                           </article>
                         ))}
+                        </div>
+                        {message.confidence_notes.length > 0 ? (
+                          <div className="confidenceNotes">
+                            {message.confidence_notes.map((note, index) => (
+                              <p key={index}>{note}</p>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </article>
@@ -1193,6 +1285,59 @@ export default function App() {
             </div>
           </section>
         ) : null}
+          </div>
+
+          <aside className="sourcePanel" aria-label="Source Map">
+            <div className="sourcePanelHeader">
+              <div>
+                <p className="eyebrow">Source Map</p>
+                <h3>Source to output</h3>
+              </div>
+              <Activity size={18} />
+            </div>
+            <div className="sourceGraph" aria-hidden="true">
+              <span className="sourceNode sourceNodePrimary">Sources</span>
+              <span className="sourceLink one" />
+              <span className="sourceNode">Ask</span>
+              <span className="sourceLink two" />
+              <span className="sourceNode">Study</span>
+              <span className="sourceLink three" />
+              <span className="sourceNode">Papers</span>
+            </div>
+            <div className="sourceStats">
+              <div>
+                <strong>{documents.length}</strong>
+                <span>Uploaded</span>
+              </div>
+              <div>
+                <strong>{readyDocuments.length}</strong>
+                <span>Ready</span>
+              </div>
+              <div>
+                <strong>{failedDocumentCount}</strong>
+                <span>Failed</span>
+              </div>
+            </div>
+            <div className="sourceChecklist">
+              <p>
+                <ShieldCheck size={15} />
+                {providerReady ? "Provider connected" : "Provider setup needed"}
+              </p>
+              <p>
+                <FileStack size={15} />
+                {artifacts.length > 0
+                  ? `${artifacts.length} study outputs saved`
+                  : "Study outputs will appear here"}
+              </p>
+              <p>
+                <ClipboardList size={15} />
+                {printables.length > 0
+                  ? `${printables.length} paper workflows`
+                  : "Paper drafts can be built from ready sources"}
+              </p>
+            </div>
+          </aside>
+        </div>
       </main>
     </div>
   );

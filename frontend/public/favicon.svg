@@ -1,5 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#102320" />
-  <path d="M18 18h19a9 9 0 0 1 9 9v19H27a9 9 0 0 1-9-9V18Z" fill="#f6fbf7" />
-  <path d="M28 27h14M28 36h10" stroke="#1f6f5f" stroke-width="4" stroke-linecap="round" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="StudyGraph">
+  <rect width="64" height="64" rx="14" fill="#17211e"/>
+  <path d="M14 20c0-4 3-7 7-7h12v34H21c-4 0-7-3-7-7V20Z" fill="#f6f1df"/>
+  <path d="M31 13h12c4 0 7 3 7 7v20c0 4-3 7-7 7H31V13Z" fill="#dce9e2"/>
+  <circle cx="24" cy="28" r="4" fill="#1f6f5f"/>
+  <circle cx="40" cy="25" r="4" fill="#f0c95a"/>
+  <circle cx="40" cy="39" r="4" fill="#c9533d"/>
+  <path d="M27.5 28h8.5M40 29v6" stroke="#17211e" stroke-width="2.5" stroke-linecap="round"/>
 </svg>
