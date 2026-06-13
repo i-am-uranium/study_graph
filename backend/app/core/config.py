@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://studygraph:studygraph@localhost:5432/studygraph"
     upload_dir: Path = Path("storage/uploads")
     embedding_dimensions: int = 1536
+    unstructured_api_url: str = "http://localhost:8001/general/v0/general"
 
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"

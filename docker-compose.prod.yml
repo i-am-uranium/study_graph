@@ -24,6 +24,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-studygraph}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-studygraph}
       UPLOAD_DIR: /app/storage/uploads
+      UNSTRUCTURED_API_URL: http://unstructured-api:8000/general/v0/general
     volumes:
       - uploaded_files:/app/storage/uploads
     depends_on:
@@ -52,6 +53,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-studygraph}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-studygraph}
       UPLOAD_DIR: /app/storage/uploads
+      UNSTRUCTURED_API_URL: http://unstructured-api:8000/general/v0/general
     volumes:
       - uploaded_files:/app/storage/uploads
     depends_on:
@@ -70,6 +72,10 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  unstructured-api:
+    image: quay.io/unstructured-io/unstructured-api:latest
+    restart: unless-stopped
 
 volumes:
   postgres_data:
