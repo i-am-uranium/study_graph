@@ -24,6 +24,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://studygraph:studygraph@db:5432/studygraph
       UPLOAD_DIR: /app/storage/uploads
+      UNSTRUCTURED_API_URL: http://unstructured-api:8000/general/v0/general
     ports:
       - "8000:8000"
     volumes:
@@ -53,6 +54,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://studygraph:studygraph@db:5432/studygraph
       UPLOAD_DIR: /app/storage/uploads
+      UNSTRUCTURED_API_URL: http://unstructured-api:8000/general/v0/general
     volumes:
       - uploaded_files:/app/storage/uploads
     depends_on:
@@ -75,6 +77,11 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  unstructured-api:
+    image: quay.io/unstructured-io/unstructured-api:latest
+    ports:
+      - "8001:8000"
 
 volumes:
   postgres_data:

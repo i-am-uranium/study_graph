@@ -22,12 +22,18 @@ from app.models import (
     PrintableSet,
     PrintableStatus,
 )
+from app.repositories.document import DocumentRepository
+from app.repositories.printable import PrintableRepository
 from app.schemas.printables import PrintableContent
 from app.services.providers import OpenAICompatibleProvider, default_provider
 
 
 def create_printable_set(db: Session, data: dict) -> tuple[PrintableSet, PrintableJob]:
+    doc_repo = DocumentRepository(db)
+    print_repo = PrintableRepository(db)
+
     document = _ready_document_or_raise(db, int(data["document_id"]))
+    
     printable = PrintableSet(
         document_id=document.id,
         title=data["title"],
@@ -39,18 +45,15 @@ def create_printable_set(db: Session, data: dict) -> tuple[PrintableSet, Printab
         content={},
         source_refs=[],
     )
-    db.add(printable)
-    db.flush()
+    
     job = PrintableJob(
-        printable_set_id=printable.id,
+        printable_set_id=None,  # Set by repository
         job_type=PrintableJobType.generate_draft.value,
         status=PrintableJobStatus.queued.value,
         payload={},
     )
-    db.add(job)
-    db.commit()
-    db.refresh(printable)
-    db.refresh(job)
+    
+    print_repo.create_printable_set_and_job(printable, job)
     return printable, job
 
 
@@ -59,14 +62,18 @@ def update_printable_content(
     printable_set_id: int,
     content: dict,
 ) -> PrintableSet:
+    print_repo = PrintableRepository(db)
     printable = _printable_or_raise(db, printable_set_id)
+    
     validated = PrintableContent.model_validate(content)
-    printable.content = validated.model_dump()
-    printable.source_refs = _collect_source_refs(printable.content)
-    printable.status = PrintableStatus.draft_ready.value
-    printable.error_message = None
-    db.commit()
-    db.refresh(printable)
+    source_refs = _collect_source_refs(validated.model_dump())
+    
+    print_repo.update_content(
+        printable,
+        content=validated.model_dump(),
+        source_refs=source_refs,
+        status=PrintableStatus.draft_ready.value,
+    )
     return printable
 
 
@@ -76,7 +83,9 @@ def queue_printable_export(
     *,
     export_type: str,
 ) -> PrintableJob:
+    print_repo = PrintableRepository(db)
     printable = _printable_or_raise(db, printable_set_id)
+    
     exportable_statuses = {
         PrintableStatus.draft_ready.value,
         PrintableStatus.export_ready.value,
@@ -84,26 +93,20 @@ def queue_printable_export(
     if printable.status not in exportable_statuses:
         raise ValueError("Printable draft is not ready for export")
 
-    printable.status = PrintableStatus.exporting.value
     job = PrintableJob(
         printable_set_id=printable.id,
         job_type=PrintableJobType.export_pdf.value,
         status=PrintableJobStatus.queued.value,
         payload={"export_type": export_type},
     )
-    db.add(job)
-    db.commit()
-    db.refresh(job)
+    
+    print_repo.queue_export_job(printable, job, status=PrintableStatus.exporting.value)
     return job
 
 
 def next_queued_printable_job(db: Session) -> PrintableJob | None:
-    return db.scalars(
-        select(PrintableJob)
-        .where(PrintableJob.status == PrintableJobStatus.queued.value)
-        .order_by(PrintableJob.created_at.asc())
-        .limit(1)
-    ).first()
+    print_repo = PrintableRepository(db)
+    return print_repo.next_queued_printable_job()
 
 
 def run_printable_job(
@@ -112,15 +115,17 @@ def run_printable_job(
     *,
     provider: OpenAICompatibleProvider | None = None,
 ) -> PrintableJob:
-    job = db.get(PrintableJob, job_id)
+    print_repo = PrintableRepository(db)
+
+    job = print_repo.get_job(job_id)
     if job is None:
         raise ValueError(f"Printable job {job_id} does not exist")
 
-    job.status = PrintableJobStatus.running.value
-    job.error_message = None
-    job.started_at = datetime.now(UTC)
-    db.commit()
-    db.refresh(job)
+    print_repo.update_job_status(
+        job_id,
+        status=PrintableJobStatus.running.value,
+        started_at=datetime.now(UTC),
+    )
 
     try:
         if job.job_type == PrintableJobType.generate_draft.value:
@@ -129,28 +134,20 @@ def run_printable_job(
             _run_export_job(db, job)
         else:
             raise ValueError(f"Unsupported printable job type {job.job_type}")
-        job = db.get(PrintableJob, job_id)
-        if job is None:
-            raise ValueError(f"Printable job {job_id} does not exist")
-        job.status = PrintableJobStatus.completed.value
-        job.completed_at = datetime.now(UTC)
-        db.commit()
-        db.refresh(job)
-        return job
+        
+        return print_repo.update_job_status(
+            job_id,
+            status=PrintableJobStatus.completed.value,
+            completed_at=datetime.now(UTC),
+        )
     except Exception as exc:
-        db.rollback()
-        job = db.get(PrintableJob, job_id)
+        print_repo.rollback()
+        job = print_repo.get_job(job_id)
         if job is None:
             raise
-        printable = db.get(PrintableSet, job.printable_set_id)
-        job.status = PrintableJobStatus.failed.value
-        job.error_message = str(exc)
-        job.completed_at = datetime.now(UTC)
-        if printable is not None:
-            printable.status = PrintableStatus.failed.value
-            printable.error_message = str(exc)
-        db.commit()
-        db.refresh(job)
+        printable = print_repo.get(job.printable_set_id)
+        
+        print_repo.mark_failed(job, error_message=str(exc), printable=printable)
         return job
 
 
@@ -161,8 +158,12 @@ def _run_generation_job(
     provider: OpenAICompatibleProvider | None,
 ) -> None:
     provider = provider or default_provider()
+    print_repo = PrintableRepository(db)
+    doc_repo = DocumentRepository(db)
+    
     printable = _printable_or_raise(db, job.printable_set_id)
     document = _ready_document_or_raise(db, printable.document_id)
+    
     chunks = sorted(document.chunks, key=lambda chunk: chunk.chunk_index)
     if not chunks:
         raise ValueError("Document has no ingested chunks")
@@ -188,14 +189,17 @@ def _run_generation_job(
     )
     parsed = json.loads(raw)
     validated = PrintableContent.model_validate(parsed)
-    printable.content = validated.model_dump()
-    printable.source_refs = _collect_source_refs(printable.content)
-    printable.status = PrintableStatus.draft_ready.value
-    printable.error_message = None
-    db.commit()
+    
+    print_repo.update_content(
+        printable,
+        content=validated.model_dump(),
+        source_refs=_collect_source_refs(validated.model_dump()),
+        status=PrintableStatus.draft_ready.value,
+    )
 
 
 def _run_export_job(db: Session, job: PrintableJob) -> None:
+    print_repo = PrintableRepository(db)
     printable = _printable_or_raise(db, job.printable_set_id)
     if not printable.content.get("sections"):
         raise ValueError("Printable draft has no questions to export")
@@ -209,16 +213,12 @@ def _run_export_job(db: Session, job: PrintableJob) -> None:
     path = export_dir / f"printable-{printable.id}-{export_type}-{uuid4().hex}.pdf"
     _write_formal_exam_pdf(printable, path, export_type=export_type)
 
-    db.add(
-        PrintableExport(
-            printable_set_id=printable.id,
-            export_type=export_type,
-            file_path=str(path),
-        )
+    export = PrintableExport(
+        printable_set_id=printable.id,
+        export_type=export_type,
+        file_path=str(path),
     )
-    printable.status = PrintableStatus.export_ready.value
-    printable.error_message = None
-    db.commit()
+    print_repo.add_export(export, printable, status=PrintableStatus.export_ready.value)
 
 
 def _write_formal_exam_pdf(printable: PrintableSet, path: Path, *, export_type: str) -> None:
@@ -366,7 +366,8 @@ def _collect_source_refs(content: dict) -> list[dict]:
 
 
 def _ready_document_or_raise(db: Session, document_id: int) -> Document:
-    document = db.get(Document, document_id)
+    doc_repo = DocumentRepository(db)
+    document = doc_repo.get(document_id)
     if document is None:
         raise ValueError(f"Document {document_id} does not exist")
     if document.status != DocumentStatus.ready.value:
@@ -375,7 +376,8 @@ def _ready_document_or_raise(db: Session, document_id: int) -> Document:
 
 
 def _printable_or_raise(db: Session, printable_set_id: int) -> PrintableSet:
-    printable = db.get(PrintableSet, printable_set_id)
+    print_repo = PrintableRepository(db)
+    printable = print_repo.get(printable_set_id)
     if printable is None:
         raise ValueError(f"Printable set {printable_set_id} does not exist")
     return printable

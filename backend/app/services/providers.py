@@ -45,11 +45,17 @@ class OpenAICompatibleProvider:
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         self.ensure_configured()
-        payload = {"model": self.settings.embedding_model, "input": texts}
-        response = self._client().post("/embeddings", json=payload)
-        response.raise_for_status()
-        data = response.json()["data"]
-        return [item["embedding"] for item in sorted(data, key=lambda item: item["index"])]
+        batch_size = 100
+        embeddings = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            payload = {"model": self.settings.embedding_model, "input": batch}
+            response = self._client().post("/embeddings", json=payload)
+            response.raise_for_status()
+            data = response.json()["data"]
+            sorted_data = sorted(data, key=lambda item: item["index"])
+            embeddings.extend([item["embedding"] for item in sorted_data])
+        return embeddings
 
     def chat(self, system_prompt: str, user_prompt: str, *, expect_json: bool = False) -> str:
         self.ensure_configured()

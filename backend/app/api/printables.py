@@ -1,10 +1,5 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import FileResponse
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from app.db.session import get_db
 from app.models import PrintableExport, PrintableJob, PrintableSet
 from app.schemas.printables import (
@@ -21,16 +16,24 @@ from app.services.printables import (
     queue_printable_export,
     update_printable_content,
 )
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/printables", tags=["printables"])
 
 
 @router.get("", response_model=list[PrintableSetRead])
 def list_printables(db: Session = Depends(get_db)) -> list[PrintableSet]:
-    return list(db.scalars(select(PrintableSet).order_by(PrintableSet.created_at.desc())).all())
+    return list(
+        db.scalars(select(PrintableSet).order_by(PrintableSet.created_at.desc())).all()
+    )
 
 
-@router.post("", response_model=PrintableCreateResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "", response_model=PrintableCreateResponse, status_code=status.HTTP_202_ACCEPTED
+)
 def create_printable(
     request: PrintableCreateRequest,
     db: Session = Depends(get_db),
@@ -44,7 +47,9 @@ def create_printable(
 
 @router.get("/jobs", response_model=list[PrintableJobRead])
 def list_printable_jobs(db: Session = Depends(get_db)) -> list[PrintableJob]:
-    return list(db.scalars(select(PrintableJob).order_by(PrintableJob.created_at.desc())).all())
+    return list(
+        db.scalars(select(PrintableJob).order_by(PrintableJob.created_at.desc())).all()
+    )
 
 
 @router.get("/{printable_id}", response_model=PrintableSetRead)

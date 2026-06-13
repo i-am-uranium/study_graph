@@ -1,15 +1,19 @@
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
-
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models import Document, DocumentChunk, DocumentIngestionJob
-from app.schemas.documents import DocumentChunkRead, DocumentRead, IngestionJobRead, UploadResponse
+from app.schemas.documents import (
+    DocumentChunkRead,
+    DocumentRead,
+    IngestionJobRead,
+    UploadResponse,
+)
 from app.services.ingestion import create_ingestion_job
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -51,7 +55,11 @@ def list_documents(db: Session = Depends(get_db)) -> list[Document]:
 @router.get("/ingestion-jobs", response_model=list[IngestionJobRead])
 def list_ingestion_jobs(db: Session = Depends(get_db)) -> list[DocumentIngestionJob]:
     return list(
-        db.scalars(select(DocumentIngestionJob).order_by(DocumentIngestionJob.created_at.desc())).all()
+        db.scalars(
+            select(DocumentIngestionJob).order_by(
+                DocumentIngestionJob.created_at.desc()
+            )
+        ).all()
     )
 
 
@@ -64,7 +72,9 @@ def get_document(document_id: int, db: Session = Depends(get_db)) -> Document:
 
 
 @router.get("/{document_id}/chunks", response_model=list[DocumentChunkRead])
-def list_chunks(document_id: int, db: Session = Depends(get_db)) -> list[DocumentChunkRead]:
+def list_chunks(
+    document_id: int, db: Session = Depends(get_db)
+) -> list[DocumentChunkRead]:
     chunks = db.scalars(
         select(DocumentChunk)
         .where(DocumentChunk.document_id == document_id)
@@ -87,7 +97,9 @@ def list_chunks(document_id: int, db: Session = Depends(get_db)) -> list[Documen
     response_model=IngestionJobRead,
     status_code=status.HTTP_202_ACCEPTED,
 )
-def run_ingestion(document_id: int, db: Session = Depends(get_db)) -> DocumentIngestionJob:
+def run_ingestion(
+    document_id: int, db: Session = Depends(get_db)
+) -> DocumentIngestionJob:
     try:
         return create_ingestion_job(db, document_id)
     except ValueError as exc:

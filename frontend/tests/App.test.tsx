@@ -259,6 +259,82 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the learning workspace source status from existing data", async () => {
+    stubApi(true, {
+      documents: [
+        {
+          id: 1,
+          filename: "physics.pdf",
+          content_type: "application/pdf",
+          status: "ready",
+          error_message: null,
+          created_at: "2026-06-13T00:00:00Z",
+          updated_at: "2026-06-13T00:00:00Z",
+        },
+        {
+          id: 2,
+          filename: "chemistry.pdf",
+          content_type: "application/pdf",
+          status: "queued",
+          error_message: null,
+          created_at: "2026-06-13T00:00:00Z",
+          updated_at: "2026-06-13T00:00:00Z",
+        },
+      ],
+      artifacts: [
+        {
+          id: 10,
+          document_id: 1,
+          artifact_type: "summary",
+          title: "Physics Summary",
+          content: { summary: "Motion notes" },
+          source_refs: [],
+          created_at: "2026-06-13T00:00:00Z",
+          updated_at: "2026-06-13T00:00:00Z",
+        },
+      ],
+    });
+    render(<App />);
+
+    expect(await screen.findByText("Learning Workspace")).toBeInTheDocument();
+    expect(screen.getByText("Source Map")).toBeInTheDocument();
+    expect(screen.getByText("1 ready")).toBeInTheDocument();
+    expect(screen.getByText("1 pending")).toBeInTheDocument();
+    expect(screen.getByText("1 artifact")).toBeInTheDocument();
+  });
+
+  it("shows Citation Lens evidence after asking a question", async () => {
+    stubApi(true, {
+      askResponse: {
+        session_id: 1,
+        answer: "Gravity pulls objects toward Earth.",
+        citations: [
+          {
+            document_id: 1,
+            chunk_id: 7,
+            chunk_index: 3,
+            filename: "physics.pdf",
+            text: "Gravity is the force that attracts objects toward Earth.",
+            metadata: {},
+            score: 0.91,
+          },
+        ],
+        confidence_notes: ["Answer grounded in one cited chunk."],
+      },
+    });
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Ask" }));
+    const textbox = await screen.findByPlaceholderText("Ask a follow-up about your study material...");
+    fireEvent.change(textbox, { target: { value: "What does gravity do?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Gravity pulls objects toward Earth.")).toBeInTheDocument();
+    expect(screen.getByText("Citation Lens")).toBeInTheDocument();
+    expect(screen.getByText("physics.pdf")).toBeInTheDocument();
+    expect(screen.getByText("Answer grounded in one cited chunk.")).toBeInTheDocument();
+  });
+
   it("toggles dark mode across the workspace", async () => {
     stubApi(true);
     const { container } = render(<App />);

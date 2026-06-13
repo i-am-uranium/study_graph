@@ -17,7 +17,9 @@ def run_worker() -> None:
         with SessionLocal() as db:
             job = next_queued_ingestion_job(db)
             if job is not None:
-                logger.info("Running ingestion job %s for document %s", job.id, job.document_id)
+                logger.info(
+                    "Running ingestion job %s for document %s", job.id, job.document_id
+                )
                 run_ingestion_job(db, job.id)
             else:
                 printable_job = next_queued_printable_job(db)
