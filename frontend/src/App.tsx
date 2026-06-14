@@ -1943,10 +1943,30 @@ export default function App() {
                       <div>
                         <h3>Ready when you are</h3>
                         <p>
-                          Ask a question below, or use the study moves to turn selected files into
-                          explanations, practice, and classroom material.
+                          Start with a guided move, or type your own question.
                         </p>
                       </div>
+                      {composerPromptModes.length > 0 ? (
+                        <div
+                          className="starterGrid"
+                          aria-label={`${personaModeLabel} starter actions`}
+                        >
+                          {composerPromptModes.slice(0, 3).map((mode) => {
+                            const Icon = mode.icon;
+                            return (
+                              <button
+                                key={mode.id}
+                                type="button"
+                                onClick={() => runStudyMode(mode)}
+                                title={mode.detail}
+                              >
+                                <Icon size={16} />
+                                <span>{mode.title}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
                       <div className="sourceReadyChips" aria-label="Selected ready files">
                         {activeContextDocuments.slice(0, 3).map((document) => (
                           <span key={document.id}>{document.filename}</span>
@@ -1961,7 +1981,9 @@ export default function App() {
               </div>
 
               <form className="askForm chatComposer" onSubmit={(event) => void onAsk(event)}>
-                {readyDocuments.length > 0 && composerPromptModes.length > 0 ? (
+                {activeMessages.length > 0 &&
+                readyDocuments.length > 0 &&
+                composerPromptModes.length > 0 ? (
                   <div
                     className="composerGuides"
                     aria-label={`${personaModeLabel} composer suggestions`}
