@@ -1,11 +1,13 @@
 from app.api import documents, printables, qa, settings, study
 from app.core.config import get_settings
+from app.core.logging import setup_logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 
 def create_app() -> FastAPI:
     app_settings = get_settings()
+    setup_logging(app_settings.log_level)
     app = FastAPI(title="StudyGraph API", version="0.1.0")
 
     app.add_middleware(

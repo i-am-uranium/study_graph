@@ -93,7 +93,13 @@ def parse_document(path: Path, content_type: str) -> ParsedDocument:
             page_to_texts = {}
 
             for start_page_idx, pdf_bytes in batches:
-                files = {"files": (f"batch_{start_page_idx}.pdf", pdf_bytes, "application/pdf")}
+                files = {
+                    "files": (
+                        f"batch_{start_page_idx}.pdf",
+                        pdf_bytes,
+                        "application/pdf",
+                    )
+                }
                 response = httpx.post(url, files=files, timeout=120.0)
                 response.raise_for_status()
                 elements = response.json()
@@ -103,7 +109,7 @@ def parse_document(path: Path, content_type: str) -> ParsedDocument:
                     if not text:
                         continue
                     metadata = element.get("metadata", {})
-                    
+
                     # Unstructured page_number is 1-indexed relative to the sub-PDF batch sent.
                     # Adjust it by adding start_page_idx to get the original document page number.
                     sub_page_num = metadata.get("page_number") or 1

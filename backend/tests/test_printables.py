@@ -53,6 +53,32 @@ class FakeProvider:
         """
 
 
+class StringSourceRefProvider(FakeProvider):
+    def chat(self, system_prompt: str, user_prompt: str, *, expect_json: bool = False) -> str:
+        return """
+        {
+          "sections": [
+            {
+              "title": "Section A - Short Answer",
+              "marks": 2,
+              "questions": [
+                {
+                  "id": "q1",
+                  "type": "short_answer",
+                  "prompt": "What is photosynthesis?",
+                  "options": [],
+                  "answer": "Green plants make food using sunlight.",
+                  "marks": 2,
+                  "answer_space_lines": 3,
+                  "source_refs": ["Page 8"]
+                }
+              ]
+            }
+          ]
+        }
+        """
+
+
 def ready_document(db_session, tmp_path: Path) -> Document:
     path = tmp_path / "science.md"
     path.write_text("Photosynthesis helps green plants make food.", encoding="utf-8")
@@ -115,6 +141,29 @@ def test_run_generation_job_persists_editable_draft(db_session, tmp_path: Path) 
     assert updated.status == PrintableStatus.draft_ready.value
     assert updated.content["sections"][0]["questions"][0]["prompt"] == "What is photosynthesis?"
     assert updated.source_refs == [{"document_id": 1, "chunk_index": 0}]
+
+
+def test_generation_job_normalizes_string_source_refs(db_session, tmp_path: Path) -> None:
+    document = ready_document(db_session, tmp_path)
+    printable, job = create_printable_set(
+        db_session,
+        {
+            "document_id": document.id,
+            "title": "Science Practice Paper",
+            "output_type": "teacher_pack",
+            "template": "formal_exam",
+            "config": {"source_scope": {"mode": "whole_book"}},
+        },
+    )
+
+    completed = run_printable_job(db_session, job.id, provider=StringSourceRefProvider())
+    updated = db_session.get(PrintableSet, printable.id)
+
+    assert completed.status == PrintableJobStatus.completed.value
+    assert updated.status == PrintableStatus.draft_ready.value
+    assert updated.content["sections"][0]["questions"][0]["source_refs"] == [
+        {"document_id": None, "chunk_index": 0, "text": "Page 8"}
+    ]
 
 
 def test_update_printable_content_preserves_teacher_edits(db_session, tmp_path: Path) -> None:

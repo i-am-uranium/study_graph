@@ -1,11 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="StudyGraph source map mark">
-  <rect width="96" height="96" rx="22" fill="#17211e"/>
-  <path d="M18 26c0-7.18 5.82-13 13-13h18v70H31c-7.18 0-13-5.82-13-13V26Z" fill="#f6f1df"/>
-  <path d="M47 13h18c7.18 0 13 5.82 13 13v44c0 7.18-5.82 13-13 13H47V13Z" fill="#dce9e2"/>
-  <path d="M47 15v66" stroke="#17211e" stroke-width="3" stroke-linecap="round"/>
-  <circle cx="35" cy="40" r="6" fill="#1f6f5f"/>
-  <circle cx="61" cy="34" r="6" fill="#f0c95a"/>
-  <circle cx="62" cy="58" r="6" fill="#c9533d"/>
-  <path d="M40.5 39 55 35.5M40.5 43.5 56 55" stroke="#17211e" stroke-width="3.5" stroke-linecap="round"/>
-  <path d="M27 62h13M27 69h17" stroke="#8f9f96" stroke-width="3" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="StudyGraph learning workspace mark">
+  <rect width="96" height="96" rx="24" fill="#F7F5EE"/>
+  <rect x="9" y="9" width="78" height="78" rx="22" fill="#18324D"/>
+  <path d="M28 22h28.5L70 35.5V70c0 4.42-3.58 8-8 8H28c-4.42 0-8-3.58-8-8V30c0-4.42 3.58-8 8-8Z" fill="#FFFEFA"/>
+  <path d="M56.5 22v10.5c0 1.66 1.34 3 3 3H70" fill="#E6EEF5"/>
+  <path d="M31 39h22M31 49h15M31 59h18" stroke="#C8BFAD" stroke-width="4" stroke-linecap="round"/>
+  <path d="M30 69c9.7-3.9 15.9-10.5 18.7-20 3.2 6.9 8.1 11.1 16.3 12.8" fill="none" stroke="#2D4F73" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="30" cy="69" r="6.2" fill="#0B8F76"/>
+  <circle cx="48.7" cy="49" r="6.2" fill="#2D4F73"/>
+  <circle cx="65" cy="61.8" r="6.2" fill="#C47C1E"/>
+  <path d="M73 17.5l2.35 4.75 5.25.76-3.8 3.7.9 5.22L73 29.46l-4.7 2.47.9-5.22-3.8-3.7 5.25-.76L73 17.5Z" fill="#C47C1E"/>
 </svg>

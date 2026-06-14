@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PrintableQuestion(BaseModel):
@@ -13,6 +13,19 @@ class PrintableQuestion(BaseModel):
     marks: int = Field(default=1, ge=0)
     answer_space_lines: int = Field(default=0, ge=0)
     source_refs: list[dict] = Field(default_factory=list)
+
+    @field_validator("source_refs", mode="before")
+    @classmethod
+    def normalize_source_refs(cls, value: any) -> list[dict]:
+        if not isinstance(value, list):
+            return []
+        normalized = []
+        for item in value:
+            if isinstance(item, str):
+                normalized.append({"document_id": None, "chunk_index": 0, "text": item})
+            elif isinstance(item, dict):
+                normalized.append(item)
+        return normalized
 
 
 class PrintableSection(BaseModel):

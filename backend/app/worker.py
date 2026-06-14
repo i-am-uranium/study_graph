@@ -2,11 +2,12 @@ import logging
 import time
 
 from app.core.config import get_settings
+from app.core.logging import setup_logging
 from app.db.session import SessionLocal
 from app.services.ingestion import next_queued_ingestion_job, run_ingestion_job
 from app.services.printables import next_queued_printable_job, run_printable_job
 
-logging.basicConfig(level=logging.INFO)
+setup_logging(get_settings().log_level)
 logger = logging.getLogger("studygraph.worker")
 
 

@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "../src/App";
@@ -46,6 +46,25 @@ function stubApi(
           embedding_model: "text-embedding-3-small",
           api_key_configured: apiKeyConfigured,
           embedding_dimensions: 1536,
+        }),
+      };
+    }
+    if (url.endsWith("/api/documents") && init?.method === "POST") {
+      const file = init.body instanceof FormData ? init.body.get("file") : null;
+      const filename = file instanceof File ? file.name : "uploaded.pdf";
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          document: {
+            id: 99,
+            filename,
+            content_type: file instanceof File ? file.type : "application/pdf",
+            status: "uploaded",
+            error_message: null,
+            created_at: "2026-06-12T00:00:00Z",
+            updated_at: "2026-06-12T00:00:00Z",
+          },
         }),
       };
     }
@@ -234,10 +253,19 @@ function stubApi(
   return fetchMock;
 }
 
+function primaryNav() {
+  return within(screen.getByRole("navigation", { name: "Primary workspace" }));
+}
+
+function clickPrimaryNav(label: string) {
+  fireEvent.click(primaryNav().getByRole("button", { name: label }));
+}
+
 describe("App", () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    localStorage.clear();
     vi.unstubAllGlobals();
   });
 
@@ -246,17 +274,73 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByText("StudyGraph")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /upload/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /upload/i }).length).toBeGreaterThan(0);
   });
 
-  it("shows provider setup guidance when the API key is missing", async () => {
+  it("uploads material when a file is dropped on the workspace upload target", async () => {
+    stubApi(true);
+    render(<App />);
+
+    const uploadTarget = await screen.findByRole("button", { name: "Upload" });
+    const file = new File(["lesson notes"], "drop-notes.pdf", { type: "application/pdf" });
+
+    fireEvent.drop(uploadTarget, {
+      dataTransfer: {
+        files: [file],
+        types: ["Files"],
+      },
+    });
+
+    expect(await screen.findByText("drop-notes.pdf")).toBeInTheDocument();
+  });
+
+  it("shows learning support setup guidance when the connection is missing", async () => {
     stubApi(false);
     render(<App />);
 
-    expect(await screen.findByText("Provider key missing")).toBeInTheDocument();
+    expect(await screen.findByText("Learning support is not connected")).toBeInTheDocument();
+    expect(screen.getByText("Connect learning support before using this action.")).toBeInTheDocument();
+  });
+
+  it("shows a recoverable offline workspace state when the backend is unavailable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    render(<App />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Offline workspace");
     expect(
-      screen.getByText("Set OPENAI_API_KEY in .env and restart the API and worker."),
+      screen.getByText("Open StudyGraph on this device to sync material, chats, and study sets."),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try reconnecting" })).toBeInTheDocument();
+    expect(screen.queryByText("StudyGraph is not connected. Start StudyGraph, then refresh.")).not.toBeInTheDocument();
+  });
+
+  it("lets users inspect a local sample workspace without the backend", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    render(<App />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Offline workspace");
+    fireEvent.click(screen.getByRole("button", { name: "Explore sample" }));
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Sample lesson - Photosynthesis.md").length).toBeGreaterThan(0);
+    expect(screen.getByText("Sample workspace")).toBeInTheDocument();
+    const lessonBrief = screen.getByRole("button", { name: "Open summary" });
+    expect(lessonBrief).toBeEnabled();
+
+    fireEvent.click(lessonBrief);
+
+    expect(await screen.findByRole("heading", { name: "Photosynthesis lesson brief" })).toBeInTheDocument();
+    expect(screen.getByText("Lesson goals")).toBeInTheDocument();
   });
 
   it("shows the learning workspace source status from existing data", async () => {
@@ -296,11 +380,11 @@ describe("App", () => {
     });
     render(<App />);
 
-    expect(await screen.findByText("Learning Workspace")).toBeInTheDocument();
-    expect(screen.getByText("Source Map")).toBeInTheDocument();
-    expect(screen.getByText("1 ready")).toBeInTheDocument();
-    expect(screen.getByText("1 pending")).toBeInTheDocument();
-    expect(screen.getByText("1 artifact")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Material" })).toBeInTheDocument();
+    expect(screen.getAllByText("physics.pdf").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("chemistry.pdf").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ready").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Waiting").length).toBeGreaterThan(0);
   });
 
   it("shows Citation Lens evidence after asking a question", async () => {
@@ -318,21 +402,34 @@ describe("App", () => {
             metadata: {},
             score: 0.91,
           },
+          {
+            document_id: 1,
+            chunk_id: 8,
+            chunk_index: 4,
+            filename: "physics.pdf",
+            text: "Objects fall because gravity accelerates them toward Earth.",
+            metadata: {},
+            score: 0.88,
+          },
         ],
-        confidence_notes: ["Answer grounded in one cited chunk."],
+        confidence_notes: ["Answer grounded in cited chunks."],
       },
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Ask" }));
-    const textbox = await screen.findByPlaceholderText("Ask a follow-up about your study material...");
+    clickPrimaryNav("Workspace");
+    const textbox = await screen.findByPlaceholderText(
+      "Ask a question, compare notes, or request examples...",
+    );
     fireEvent.change(textbox, { target: { value: "What does gravity do?" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     expect(await screen.findByText("Gravity pulls objects toward Earth.")).toBeInTheDocument();
-    expect(screen.getByText("Citation Lens")).toBeInTheDocument();
-    expect(screen.getByText("physics.pdf")).toBeInTheDocument();
-    expect(screen.getByText("Answer grounded in one cited chunk.")).toBeInTheDocument();
+    const evidence = screen.getByLabelText("Answer sources");
+    expect(evidence).toHaveTextContent("From your files");
+    expect(within(evidence).getAllByText("physics.pdf")).toHaveLength(1);
+    expect(screen.getByText("References used")).toBeInTheDocument();
+    expect(screen.getByText("Answer grounded in cited chunks.")).toBeInTheDocument();
   });
 
   it("toggles dark mode across the workspace", async () => {
@@ -346,7 +443,94 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Light mode" })).toBeInTheDocument();
   });
 
-  it("disables ingestion when a document is already ready", async () => {
+  it("keeps theme preferences after a refresh", async () => {
+    stubApi(true);
+    const firstRender = render(<App />);
+
+    expect(await screen.findByText("StudyGraph")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Dark mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "High contrast" }));
+    fireEvent.click(screen.getByRole("button", { name: "Text size" }));
+    firstRender.unmount();
+
+    const secondRender = render(<App />);
+
+    expect(await screen.findByText("StudyGraph")).toBeInTheDocument();
+    expect(secondRender.container.querySelector(".appShell")).toHaveClass("theme-dark");
+    expect(secondRender.container.querySelector(".appShell")).toHaveClass("contrast-high");
+    expect(secondRender.container.querySelector(".appShell")).toHaveClass("text-comfortable");
+  });
+
+  it("exposes first-class appearance controls in Settings", async () => {
+    stubApi(true);
+    const { container } = render(<App />);
+
+    expect(await screen.findByText("StudyGraph")).toBeInTheDocument();
+    clickPrimaryNav("Settings");
+
+    expect(screen.getByText("Studio preferences")).toBeInTheDocument();
+    expect(screen.getByLabelText("Theme preference")).toBeInTheDocument();
+    expect(screen.getByLabelText("Reading size preference")).toBeInTheDocument();
+    expect(screen.getByLabelText("Contrast preference")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }));
+    fireEvent.click(screen.getByRole("button", { name: "Large" }));
+    fireEvent.click(screen.getByRole("button", { name: "High contrast off" }));
+
+    expect(container.querySelector(".appShell")).toHaveClass("theme-dark");
+    expect(container.querySelector(".appShell")).toHaveClass("text-large");
+    expect(container.querySelector(".appShell")).toHaveClass("contrast-high");
+  });
+
+  it("opens on one Workspace with chat, upload, and persona controls", async () => {
+    stubApi(true);
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Workspace" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Learning canvas" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Material" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "No prepared files" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Workspace command center")).toBeInTheDocument();
+    expect(screen.getByLabelText("Workspace flow")).toHaveTextContent("AddPrepareAskCreate");
+    expect(screen.getByLabelText("Learning session pulse")).toHaveTextContent(
+      "Add material to begin",
+    );
+    expect(screen.getByLabelText("Next workspace step")).toHaveTextContent(
+      "Start with a file",
+    );
+    expect(screen.queryByLabelText("Study flow progress")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Conversation history")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upload" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upload file" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add material" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explore sample" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Student view" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Teacher view" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Admin view" })).toBeInTheDocument();
+    expect(primaryNav().getByRole("button", { name: "Workspace" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Home" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ask AI" })).not.toBeInTheDocument();
+  });
+
+  it("toggles high contrast and cycles text scale without backend calls", async () => {
+    const fetchMock = stubApi(true);
+    const { container } = render(<App />);
+
+    expect(await screen.findByText("StudyGraph")).toBeInTheDocument();
+    const initialCallCount = fetchMock.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "High contrast" }));
+    expect(container.querySelector(".appShell")).toHaveClass("contrast-high");
+
+    fireEvent.click(screen.getByRole("button", { name: "Text size" }));
+    expect(container.querySelector(".appShell")).toHaveClass("text-comfortable");
+    expect(fetchMock.mock.calls).toHaveLength(initialCallCount);
+  });
+
+  it("shows only useful actions when class material is already ready", async () => {
     stubApi(true, {
       documents: [
         {
@@ -362,8 +546,117 @@ describe("App", () => {
     });
     render(<App />);
 
-    expect(await screen.findByText("production_rag_quiz.pdf")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Ingest" })).toBeDisabled();
+    clickPrimaryNav("Workspace");
+    expect((await screen.findAllByText("production_rag_quiz.pdf")).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Prepare" })).not.toBeInTheDocument();
+    const moves = screen.getByLabelText("Teaching modes composer suggestions");
+    expect(within(moves).getByRole("button", { name: "Check understanding" })).toBeEnabled();
+    expect(within(moves).getByRole("button", { name: "Exit ticket" })).toBeEnabled();
+  });
+
+  it("renders Workspace as one learning canvas instead of duplicate panels", async () => {
+    stubApi(true, {
+      documents: [
+        {
+          id: 1,
+          filename: "lesson-notes.pdf",
+          content_type: "application/pdf",
+          status: "ready",
+          error_message: null,
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:00:00Z",
+        },
+      ],
+    });
+    const { container } = render(<App />);
+
+    clickPrimaryNav("Workspace");
+
+    expect(await screen.findByLabelText("Conversation history")).toBeInTheDocument();
+    const learningCanvas = container.querySelector(".learningCanvas");
+    const canvasRail = container.querySelector(".canvasRail");
+    const canvasCenter = container.querySelector(".canvasCenter");
+
+    expect(learningCanvas).not.toBeNull();
+    expect(canvasRail).not.toBeNull();
+    expect(canvasCenter).not.toBeNull();
+    expect(container.querySelector(".canvasInsight")).toBeNull();
+    expect(container.querySelector(".askPanel")).toBeNull();
+    expect(container.querySelector(".materialLibrary")).toBeNull();
+  });
+
+  it("shows the learning flow inside the Workspace mission", async () => {
+    stubApi(true, {
+      documents: [
+        {
+          id: 1,
+          filename: "lesson-notes.pdf",
+          content_type: "application/pdf",
+          status: "ready",
+          error_message: null,
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:00:00Z",
+        },
+      ],
+    });
+    render(<App />);
+
+    const mission = await screen.findByLabelText("Next workspace step");
+    expect(mission).toHaveTextContent("Guide the lesson");
+    expect(screen.getByText("Ready when you are")).toBeInTheDocument();
+    expect(screen.getByLabelText("Selected ready files")).toHaveTextContent("lesson-notes.pdf");
+    const moves = screen.getByLabelText("Teaching modes composer suggestions");
+    expect(within(moves).getByRole("button", { name: "Check understanding" })).toBeInTheDocument();
+    expect(within(moves).getByRole("button", { name: "Exit ticket" })).toBeInTheDocument();
+  });
+
+  it("adapts study modes by role and fills the learning composer", async () => {
+    stubApi(true, {
+      documents: [
+        {
+          id: 1,
+          filename: "lesson-notes.pdf",
+          content_type: "application/pdf",
+          status: "ready",
+          error_message: null,
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:00:00Z",
+        },
+      ],
+    });
+    render(<App />);
+
+    const teacherMission = await screen.findByLabelText("Next workspace step");
+    expect(teacherMission).toHaveTextContent("Guide the lesson");
+    const teacherMoves = screen.getByLabelText("Teaching modes composer suggestions");
+    expect(teacherMoves).toBeInTheDocument();
+    fireEvent.click(within(teacherMoves).getByRole("button", { name: "Check understanding" }));
+    expect(
+      screen.getByPlaceholderText("Ask a question, compare notes, or request examples..."),
+    ).toHaveValue("Create five checks for understanding with answer guidance.");
+
+    expect(
+      within(teacherMoves).getByRole("button", { name: "Check understanding" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Student view" }));
+    const studentMoves = screen.getByLabelText("Study modes composer suggestions");
+    expect(studentMoves).toBeInTheDocument();
+    expect(within(studentMoves).getByRole("button", { name: "Explain" })).toBeInTheDocument();
+    expect(within(studentMoves).getByRole("button", { name: "Practice" })).toBeInTheDocument();
+    const mode = within(studentMoves).getByRole("button", {
+      name: "Plan",
+    });
+    fireEvent.click(mode);
+
+    expect(
+      screen.getByPlaceholderText("Ask a question, compare notes, or request examples..."),
+    ).toHaveValue("Make a 10-minute revision plan.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Admin view" }));
+    const adminMoves = screen.getByLabelText("Oversight modes composer suggestions");
+    expect(adminMoves).toBeInTheDocument();
+    expect(within(adminMoves).getByRole("button", { name: "Class pulse" })).toBeInTheDocument();
   });
 
   it("queues ingestion as a job and shows the job id", async () => {
@@ -382,10 +675,10 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Ingest" }));
+    clickPrimaryNav("Workspace");
+    fireEvent.click(await screen.findByRole("button", { name: "Prepare" }));
 
-    expect(await screen.findByText("Job #42 · queued")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Queued" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Waiting" })).toBeDisabled();
   });
 
   it("polls while ingestion work is pending", async () => {
@@ -424,7 +717,10 @@ describe("App", () => {
     });
     render(<App />);
 
-    expect(await screen.findByText("Job #41 · running")).toBeInTheDocument();
+    clickPrimaryNav("Workspace");
+    const preparingButtons = await screen.findAllByRole("button", { name: "Preparing" });
+    expect(preparingButtons.length).toBeGreaterThan(0);
+    preparingButtons.forEach((button) => expect(button).toBeDisabled());
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/api/documents")),
@@ -476,9 +772,10 @@ describe("App", () => {
     });
     render(<App />);
 
-    const summaryButton = await screen.findByRole("button", { name: "Summary" });
+    clickPrimaryNav("Workspace");
+    const summaryButton = await screen.findByRole("button", { name: "Open summary" });
     await waitFor(() =>
-      expect(summaryButton).toHaveAttribute("title", "Open summary in Study Set"),
+      expect(summaryButton).toHaveAttribute("title", "Open summary in Study Sets"),
     );
     fireEvent.click(summaryButton);
 
@@ -520,9 +817,10 @@ describe("App", () => {
     });
     render(<App />);
 
-    const flashcardsButton = await screen.findByRole("button", { name: "Flashcards" });
+    clickPrimaryNav("Workspace");
+    const flashcardsButton = await screen.findByRole("button", { name: "Open flashcards" });
     await waitFor(() =>
-      expect(flashcardsButton).toHaveAttribute("title", "Open flashcards in Study Set"),
+      expect(flashcardsButton).toHaveAttribute("title", "Open flashcards in Study Sets"),
     );
     fireEvent.click(flashcardsButton);
 
@@ -537,8 +835,19 @@ describe("App", () => {
     });
   });
 
-  it("loads a saved conversation in the Ask section", async () => {
+  it("loads a saved conversation in the Workspace", async () => {
     stubApi(true, {
+      documents: [
+        {
+          id: 1,
+          filename: "production_rag_quiz.pdf",
+          content_type: "application/pdf",
+          status: "ready",
+          error_message: null,
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:00:00Z",
+        },
+      ],
       qaSessions: [
         {
           id: 5,
@@ -582,10 +891,52 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Ask" }));
+    clickPrimaryNav("Workspace");
 
     expect(await screen.findByText("What is RAG?")).toBeInTheDocument();
     expect(screen.getAllByText("RAG uses retrieval to ground answers.").length).toBeGreaterThan(0);
+    const nextSteps = screen.getByLabelText("Study next");
+    expect(within(nextSteps).getByRole("button", { name: "Check me" })).toBeInTheDocument();
+    expect(within(nextSteps).getByRole("button", { name: "Make practice" })).toBeInTheDocument();
+    expect(within(nextSteps).getByRole("button", { name: "Save brief" })).toBeInTheDocument();
+  });
+
+  it("keeps saved conversation previews short in the Workspace rail", async () => {
+    const longAnswer =
+      "1. **Question:** What is the difference between scalability and performance? **Answer Guidance:** Scalability is about handling more load as resources are added. Performance is how quickly one request completes. This full answer should stay in the conversation, not the rail.";
+    stubApi(true, {
+      qaSessions: [
+        {
+          id: 7,
+          title: "Scalability review",
+          selected_document_ids: [],
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:01:00Z",
+          message_count: 2,
+          last_message: longAnswer,
+        },
+      ],
+      qaSessionDetails: {
+        7: {
+          id: 7,
+          title: "Scalability review",
+          selected_document_ids: [],
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:01:00Z",
+          messages: [],
+        },
+      },
+    });
+    render(<App />);
+
+    const savedConversation = await screen.findByRole("button", {
+      name: "Open conversation: Scalability review",
+    });
+
+    expect(savedConversation).toHaveTextContent("Scalability review");
+    expect(savedConversation).toHaveTextContent("What is the difference");
+    expect(savedConversation).not.toHaveTextContent("Answer Guidance");
+    expect(savedConversation).not.toHaveTextContent("This full answer should stay");
   });
 
   it("renders assistant conversation text with rich formatting", async () => {
@@ -634,7 +985,7 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Ask" }));
+    clickPrimaryNav("Workspace");
 
     expect(await screen.findByText("Retrieval of Evidence:")).toHaveProperty("tagName", "STRONG");
     expect(screen.getByText("Hybrid Search:")).toHaveProperty("tagName", "STRONG");
@@ -695,8 +1046,10 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Ask" }));
-    const textbox = await screen.findByPlaceholderText("Ask a follow-up about your study material...");
+    clickPrimaryNav("Workspace");
+    const textbox = await screen.findByPlaceholderText(
+      "Ask a question, compare notes, or request examples...",
+    );
     fireEvent.change(textbox, { target: { value: "What is hybrid search?" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
@@ -731,7 +1084,10 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Study Set" }));
+    clickPrimaryNav("Study Sets");
+    expect(await screen.findByRole("heading", { name: "Review queue" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Study set actions")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cards" })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "Open reader for Retrieval notes" }));
 
     const reader = await screen.findByRole("region", { name: "Reader mode" });
@@ -762,10 +1118,91 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Dark mode" }));
-    fireEvent.click(screen.getByRole("button", { name: "Study Set" }));
+    clickPrimaryNav("Study Sets");
     fireEvent.click(await screen.findByRole("button", { name: "Open reader for Dark reader notes" }));
 
     expect(await screen.findByRole("region", { name: "Reader mode" })).toHaveClass("dark");
+  });
+
+  it("previews another study set from the review queue", async () => {
+    stubApi(true, {
+      artifacts: [
+        {
+          id: 31,
+          document_id: 1,
+          artifact_type: "summary",
+          title: "First notes",
+          content: { summary: "First summary." },
+          source_refs: [],
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:00:00Z",
+        },
+        {
+          id: 32,
+          document_id: 1,
+          artifact_type: "flashcards",
+          title: "Second deck",
+          content: { flashcards: [{ front: "Term", back: "Definition" }] },
+          source_refs: [],
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:00:00Z",
+        },
+      ],
+    });
+    render(<App />);
+
+    clickPrimaryNav("Study Sets");
+    const focus = await screen.findByLabelText("Focused study set");
+    expect(within(focus).getByRole("heading", { name: "First notes" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview Second deck" }));
+
+    expect(within(focus).getByRole("heading", { name: "Second deck" })).toBeInTheDocument();
+    expect(within(focus).getByLabelText("Flashcard practice")).toBeInTheDocument();
+    const progress = within(focus).getByLabelText("Practice progress");
+    expect(progress).toHaveTextContent("Try recall first");
+    expect(progress).toHaveTextContent("1 / 1");
+    expect(progress).toHaveTextContent("0 left");
+    expect(within(focus).getByText("Term")).toBeInTheDocument();
+    expect(within(focus).queryByText("Definition")).not.toBeInTheDocument();
+
+    fireEvent.click(within(focus).getByRole("button", { name: "Reveal answer" }));
+
+    expect(within(focus).getByText("Definition")).toBeInTheDocument();
+    expect(progress).toHaveTextContent("Rate recall");
+  });
+
+  it("keeps review queue previews short", async () => {
+    stubApi(true, {
+      artifacts: [
+        {
+          id: 33,
+          document_id: 1,
+          artifact_type: "flashcards",
+          title: "Long deck",
+          content: {
+            flashcards: [
+              {
+                front:
+                  "What is the difference between scalability and performance in system design?",
+                back:
+                  "Scalability means the system can handle more work as resources are added, while performance means a single request is fast. This long explanation belongs in practice or reader mode, not the queue.",
+              },
+            ],
+          },
+          source_refs: [],
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:00:00Z",
+        },
+      ],
+    });
+    render(<App />);
+
+    clickPrimaryNav("Study Sets");
+
+    const queue = await screen.findByLabelText("Saved study sets");
+    expect(queue).toHaveTextContent("What is the difference");
+    expect(queue).not.toHaveTextContent("This long explanation belongs");
   });
 
   it("renders flashcards inside reader mode", async () => {
@@ -785,7 +1222,7 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Study Set" }));
+    clickPrimaryNav("Study Sets");
     fireEvent.click(await screen.findByRole("button", { name: "Open reader for RAG cards" }));
 
     expect(await screen.findByRole("region", { name: "Reader mode" })).toBeInTheDocument();
@@ -793,7 +1230,7 @@ describe("App", () => {
     expect(screen.getByText("Dense plus keyword retrieval.")).toBeInTheDocument();
   });
 
-  it("queues a printable paper draft from Paper Builder", async () => {
+  it("queues a printable paper draft from Papers", async () => {
     const fetchMock = stubApi(true, {
       documents: [
         {
@@ -809,17 +1246,70 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Paper Builder" }));
+    clickPrimaryNav("Papers");
+    expect(await screen.findByLabelText("Paper blueprint")).toBeInTheDocument();
+    expect(screen.getByText("Paper studio")).toBeInTheDocument();
+    const paperSteps = screen.getByLabelText("Paper setup steps");
+    expect(within(paperSteps).getByRole("button", { name: "Source" })).toBeInTheDocument();
+    expect(within(paperSteps).getByRole("button", { name: "Format" })).toBeInTheDocument();
+    expect(within(paperSteps).getByRole("button", { name: "Classroom" })).toBeInTheDocument();
+    expect(within(paperSteps).getByRole("button", { name: "Mix" })).toBeInTheDocument();
     fireEvent.change(await screen.findByLabelText("Paper title"), {
       target: { value: "Science Paper" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create paper" }));
 
-    expect(await screen.findByText("Job #55 · generate draft · queued")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/api/printables",
-      expect.objectContaining({ method: "POST" }),
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://localhost:8000/api/printables",
+        expect.objectContaining({ method: "POST" }),
+      ),
     );
+  });
+
+  it("shows a readable paper error instead of validation internals", async () => {
+    stubApi(true, {
+      documents: [
+        {
+          id: 1,
+          filename: "science.pdf",
+          content_type: "application/pdf",
+          status: "ready",
+          error_message: null,
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:00:00Z",
+        },
+      ],
+      printables: [
+        {
+          id: 30,
+          document_id: 1,
+          title: "Science Paper",
+          output_type: "teacher_pack",
+          template: "formal_exam",
+          status: "failed",
+          error_message:
+            "18 validation errors for PrintableContent sections.0.questions.0.source_refs.0 Input should be a valid dictionary [type=dict_type]",
+          config: {},
+          content: {},
+          source_refs: [],
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:00:00Z",
+        },
+      ],
+    });
+    render(<App />);
+
+    clickPrimaryNav("Papers");
+
+    expect(
+      await screen.findByText("The paper draft needs to be regenerated."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Try creating the paper again.")).toBeInTheDocument();
+    expect(screen.queryByText(/validation errors for PrintableContent/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/type=dict_type/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Creating paper")).not.toBeInTheDocument();
+    expect(screen.queryByText("Paper needs a retry")).not.toBeInTheDocument();
   });
 
   it("edits a printable draft and queues PDF export", async () => {
@@ -873,11 +1363,12 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Paper Builder" }));
+    clickPrimaryNav("Papers");
+    fireEvent.click(await screen.findByRole("button", { name: "Edit draft" }));
     const prompt = await screen.findByDisplayValue("What is photosynthesis?");
     fireEvent.change(prompt, { target: { value: "Define photosynthesis." } });
-    fireEvent.click(screen.getByRole("button", { name: "Save Draft Edits" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Export Teacher Pack" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Download Teacher Pack" }));
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/api/printables/30",

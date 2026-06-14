@@ -1,9 +1,11 @@
+import logging
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
-
 from app.core.config import get_settings
+
+logger = logging.getLogger("studygraph.providers")
 
 
 @dataclass(frozen=True)
@@ -12,6 +14,7 @@ class ProviderSettings:
     base_url: str
     chat_model: str
     embedding_model: str
+    embedding_dimensions: int = 512
 
 
 class OpenAICompatibleProvider:
@@ -23,6 +26,7 @@ class OpenAICompatibleProvider:
                 base_url=app_settings.openai_base_url,
                 chat_model=app_settings.chat_model,
                 embedding_model=app_settings.embedding_model,
+                embedding_dimensions=app_settings.embedding_dimensions,
             )
         self.settings = settings
 
@@ -49,22 +53,52 @@ class OpenAICompatibleProvider:
         embeddings = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
-            payload = {"model": self.settings.embedding_model, "input": batch}
+            payload = {
+                "model": self.settings.embedding_model,
+                "input": batch,
+                "dimensions": self.settings.embedding_dimensions,
+            }
             response = self._client().post("/embeddings", json=payload)
             response.raise_for_status()
-            data = response.json()["data"]
+            response_json = response.json()
+            data = response_json["data"]
             sorted_data = sorted(data, key=lambda item: item["index"])
             embeddings.extend([item["embedding"] for item in sorted_data])
+
+            usage = response_json.get("usage", {})
+            logger.info(
+                "Embeddings generated",
+                extra={
+                    "model": self.settings.embedding_model,
+                    "batch_size": len(batch),
+                    "prompt_tokens": usage.get("prompt_tokens"),
+                    "total_tokens": usage.get("total_tokens"),
+                },
+            )
         return embeddings
 
-    def chat(self, system_prompt: str, user_prompt: str, *, expect_json: bool = False) -> str:
+    def chat(
+        self, system_prompt: str, user_prompt: str, *, expect_json: bool = False
+    ) -> str:
         self.ensure_configured()
         payload = self.chat_payload(system_prompt, user_prompt)
         if expect_json:
             payload["response_format"] = {"type": "json_object"}
         response = self._client().post("/chat/completions", json=payload)
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+        response_json = response.json()
+
+        usage = response_json.get("usage", {})
+        logger.info(
+            "Chat completion completed",
+            extra={
+                "model": self.settings.chat_model,
+                "prompt_tokens": usage.get("prompt_tokens"),
+                "completion_tokens": usage.get("completion_tokens"),
+                "total_tokens": usage.get("total_tokens"),
+            },
+        )
+        return response_json["choices"][0]["message"]["content"]
 
     def _client(self) -> httpx.Client:
         return httpx.Client(

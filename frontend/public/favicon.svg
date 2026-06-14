@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="StudyGraph">
-  <rect width="64" height="64" rx="14" fill="#17211e"/>
-  <path d="M14 20c0-4 3-7 7-7h12v34H21c-4 0-7-3-7-7V20Z" fill="#f6f1df"/>
-  <path d="M31 13h12c4 0 7 3 7 7v20c0 4-3 7-7 7H31V13Z" fill="#dce9e2"/>
-  <circle cx="24" cy="28" r="4" fill="#1f6f5f"/>
-  <circle cx="40" cy="25" r="4" fill="#f0c95a"/>
-  <circle cx="40" cy="39" r="4" fill="#c9533d"/>
-  <path d="M27.5 28h8.5M40 29v6" stroke="#17211e" stroke-width="2.5" stroke-linecap="round"/>
+  <rect width="64" height="64" rx="16" fill="#18324D"/>
+  <path d="M18 11h21l9 9v31c0 2.76-2.24 5-5 5H18c-2.76 0-5-2.24-5-5V16c0-2.76 2.24-5 5-5Z" fill="#FFFEFA"/>
+  <path d="M39 11v7c0 1.1.9 2 2 2h7" fill="#E6EEF5"/>
+  <path d="M20 40.8c6.8-2.9 11.2-7.7 13.2-14.5 2.4 4.9 6.1 7.9 12 9.1" fill="none" stroke="#2D4F73" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="20" cy="40.8" r="4.4" fill="#0B8F76"/>
+  <circle cx="33.2" cy="26.3" r="4.4" fill="#2D4F73"/>
+  <circle cx="45.2" cy="35.4" r="4.4" fill="#C47C1E"/>
 </svg>
