@@ -44,6 +44,10 @@ def upload_document(
     db.add(document)
     db.commit()
     db.refresh(document)
+
+    # Automatically queue the ingestion job upon upload
+    create_ingestion_job(db, document.id)
+
     return UploadResponse(document=document)
 
 

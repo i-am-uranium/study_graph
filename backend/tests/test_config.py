@@ -18,3 +18,17 @@ def test_settings_loads_root_env_when_started_from_backend(
     settings = Settings()
 
     assert settings.openai_api_key == "test-root-key"
+
+
+def test_frontend_origins_expand_loopback_aliases() -> None:
+    settings = Settings(
+        FRONTEND_ORIGINS="http://localhost:5173,http://localhost:8080",
+        OPENAI_API_KEY="test",
+    )
+
+    assert settings.frontend_origins == [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ]

@@ -176,12 +176,16 @@ def _run_generation_job(
         (
             "Return strict JSON for a printable school paper. The top-level object must contain "
             "a sections array. Each section has title, marks, and questions. Each question has "
-            "id, type, prompt, options, answer, marks, answer_space_lines, and source_refs."
+            "id, type, prompt, options, answer, marks, answer_space_lines, and source_refs.\n"
+            "CRITICAL: Each item in 'source_refs' must be a JSON object (NOT a string) containing "
+            "'document_id' (integer) and 'chunk_index' (integer matching the chunk index from the "
+            "[chunk {index}] headings in the source material)."
         ),
         (
             f"Create an editable formal school paper draft.\n"
             f"Title: {printable.title}\n"
             f"Output type: {printable.output_type}\n"
+            f"Document ID: {printable.document_id}\n"
             f"Config JSON: {json.dumps(config)}\n\n"
             f"Source material:\n{context}"
         ),

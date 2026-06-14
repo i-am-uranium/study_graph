@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -14,15 +15,17 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     api_host: str = "0.0.0.0"
-    api_port: int = 8000
+    api_port: int = 9000
     frontend_origins_raw: str = Field(
-        default="http://localhost:5173,http://localhost:8080",
+        default="http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080",
         alias="FRONTEND_ORIGINS",
     )
 
-    database_url: str = "postgresql+psycopg://studygraph:studygraph@localhost:5432/studygraph"
+    database_url: str = (
+        "postgresql+psycopg://studygraph:studygraph@localhost:5432/studygraph"
+    )
     upload_dir: Path = Path("storage/uploads")
-    embedding_dimensions: int = 1536
+    embedding_dimensions: int = 512
     unstructured_api_url: str = "http://localhost:8001/general/v0/general"
 
     openai_api_key: str = ""
@@ -31,6 +34,7 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
 
     worker_poll_seconds: float = 5.0
+    log_level: str = "INFO"
 
     @field_validator("upload_dir", mode="before")
     @classmethod
@@ -39,7 +43,34 @@ class Settings(BaseSettings):
 
     @property
     def frontend_origins(self) -> list[str]:
-        return [origin.strip() for origin in self.frontend_origins_raw.split(",") if origin.strip()]
+        configured_origins = [
+            origin.strip()
+            for origin in self.frontend_origins_raw.split(",")
+            if origin.strip()
+        ]
+        return expand_loopback_origins(configured_origins)
+
+
+def expand_loopback_origins(origins: list[str]) -> list[str]:
+    expanded: list[str] = []
+    seen: set[str] = set()
+
+    for origin in origins:
+        for candidate in (origin, loopback_origin_alias(origin)):
+            if candidate and candidate not in seen:
+                expanded.append(candidate)
+                seen.add(candidate)
+
+    return expanded
+
+
+def loopback_origin_alias(origin: str) -> str | None:
+    parsed = urlparse(origin)
+    if parsed.hostname == "localhost":
+        return urlunparse(parsed._replace(netloc=parsed.netloc.replace("localhost", "127.0.0.1", 1)))
+    if parsed.hostname == "127.0.0.1":
+        return urlunparse(parsed._replace(netloc=parsed.netloc.replace("127.0.0.1", "localhost", 1)))
+    return None
 
 
 @lru_cache
