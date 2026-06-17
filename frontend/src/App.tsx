@@ -47,6 +47,7 @@ import {
   uploadDocument,
 } from "./api";
 import { RichText } from "./RichText";
+import SourceConstellation from "./SourceConstellation";
 import type {
   IngestionJob,
   PrintableExport,
@@ -1937,44 +1938,17 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="conversationEmpty sourceReadyState">
-                      <div className="sourceReadyIcon">
-                        <BookOpen size={24} />
-                      </div>
-                      <div>
-                        <h3>Ready when you are</h3>
-                        <p>
-                          Start with a guided move, or type your own question.
-                        </p>
-                      </div>
-                      {composerPromptModes.length > 0 ? (
-                        <div
-                          className="starterGrid"
-                          aria-label={`${personaModeLabel} starter actions`}
-                        >
-                          {composerPromptModes.slice(0, 3).map((mode) => {
-                            const Icon = mode.icon;
-                            return (
-                              <button
-                                key={mode.id}
-                                type="button"
-                                onClick={() => runStudyMode(mode)}
-                                title={mode.detail}
-                              >
-                                <Icon size={16} />
-                                <span>{mode.title}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                      <div className="sourceReadyChips" aria-label="Selected ready files">
-                        {activeContextDocuments.slice(0, 3).map((document) => (
-                          <span key={document.id}>{document.filename}</span>
-                        ))}
-                        {activeContextDocuments.length > 3 ? (
-                          <span>+{activeContextDocuments.length - 3} more</span>
-                        ) : null}
-                      </div>
+                      <SourceConstellation
+                        documents={activeContextDocuments}
+                        moves={composerPromptModes.map((mode) => ({
+                          id: mode.id,
+                          title: mode.title,
+                          detail: mode.detail,
+                          icon: mode.icon,
+                          onRun: () => runStudyMode(mode),
+                        }))}
+                        modesLabel={personaModeLabel}
+                      />
                     </div>
                   )
                 ) : null}
