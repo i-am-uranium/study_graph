@@ -1,39 +1,40 @@
 :root {
-  --font-display:
-    "Aptos Display", "Avenir Next", "SF Pro Display", ui-sans-serif, system-ui,
-    sans-serif;
+  --font-display: "Literata", Georgia, "Times New Roman", serif;
   --font-sans:
-    "Aptos", "Avenir Next", "SF Pro Text", ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --bg: #f4f7fb;
-  --bg-strong: #e9eff7;
-  --canvas: #f7fafe;
-  --surface: #fbfdff;
-  --surface-raised: #ffffff;
-  --surface-soft: #eef3f9;
-  --ink: #111827;
-  --ink-soft: #243044;
-  --muted: #6b7483;
-  --muted-strong: #445167;
-  --line: #dbe3ee;
-  --line-strong: #b9c6d8;
-  --primary: #5146c8;
-  --primary-strong: #2f2a7c;
-  --primary-soft: #ecebff;
-  --accent: #0f8b75;
-  --accent-soft: #e3f7f1;
-  --signal: #d97706;
-  --signal-soft: #fff3dc;
-  --danger: #e11d48;
-  --danger-soft: #fff1f2;
-  --warning: #b45309;
-  --warning-soft: #fef3c7;
-  --success: #059669;
-  --success-soft: #ecfdf5;
-  --sidebar-ink: #172033;
-  --sidebar-line: #e2e8f0;
-  --shadow: 0 24px 56px rgba(33, 45, 68, 0.1);
-  --shadow-soft: 0 1px 2px rgba(33, 45, 68, 0.05);
+    "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  --font-reading: "Literata", Georgia, "Times New Roman", serif;
+  --bg: oklch(0.974 0.008 84);
+  --bg-strong: oklch(0.952 0.013 82);
+  --canvas: oklch(0.981 0.007 84);
+  --surface: oklch(0.99 0.006 84);
+  --surface-raised: oklch(0.996 0.004 84);
+  --surface-soft: oklch(0.953 0.013 82);
+  --ink: oklch(0.255 0.018 68);
+  --ink-soft: oklch(0.36 0.021 68);
+  --muted: oklch(0.47 0.02 70);
+  --muted-strong: oklch(0.4 0.022 70);
+  --line: oklch(0.902 0.012 80);
+  --line-strong: oklch(0.79 0.017 78);
+  --primary: oklch(0.43 0.085 165);
+  --primary-strong: oklch(0.33 0.075 167);
+  --primary-soft: oklch(0.93 0.032 165);
+  --on-primary: oklch(0.985 0.006 84);
+  --accent: oklch(0.7 0.12 73);
+  --accent-soft: oklch(0.928 0.05 80);
+  --on-accent: oklch(0.26 0.03 60);
+  --signal: oklch(0.62 0.13 50);
+  --signal-soft: oklch(0.93 0.045 62);
+  --danger: oklch(0.55 0.17 23);
+  --danger-soft: oklch(0.938 0.035 25);
+  --warning: oklch(0.6 0.115 62);
+  --warning-soft: oklch(0.93 0.05 75);
+  --success: oklch(0.55 0.1 158);
+  --success-soft: oklch(0.93 0.04 160);
+  --sidebar-ink: oklch(0.28 0.02 68);
+  --sidebar-line: oklch(0.9 0.012 80);
+  --shadow: 0 24px 56px oklch(0.3 0.03 70 / 0.13);
+  --shadow-soft: 0 1px 2px oklch(0.3 0.03 70 / 0.06);
   --grid-line: color-mix(in srgb, var(--line) 8%, transparent);
   --radius: 10px;
   --radius-lg: 16px;
@@ -102,36 +103,38 @@ label[role="button"]:focus-visible {
 }
 
 .theme-dark {
-  --bg: #0d1114;
-  --bg-strong: #151916;
-  --canvas: #101518;
-  --surface: #12181b;
-  --surface-raised: #182022;
-  --surface-soft: #101518;
-  --ink: #f5f3ea;
-  --ink-soft: #e2dfd3;
-  --muted: #9fa89f;
-  --muted-strong: #c5cbc0;
-  --line: #2c3736;
-  --line-strong: #445250;
-  --primary: #9bbad5;
-  --primary-strong: #d1e5f5;
-  --primary-soft: #1d3140;
-  --accent: #66d8bf;
-  --accent-soft: #123b35;
-  --signal: #f1be6a;
-  --signal-soft: #3b2a12;
-  --danger: #fb7185;
-  --danger-soft: #4c0519;
-  --warning: #fbbf24;
-  --warning-soft: #451a03;
-  --success: #34d399;
-  --success-soft: #052e2b;
-  --sidebar-ink: #f8fafc;
-  --sidebar-line: #273244;
-  --shadow: 0 28px 58px rgba(0, 0, 0, 0.32);
-  --shadow-soft: 0 10px 26px rgba(0, 0, 0, 0.18);
-  --grid-line: color-mix(in srgb, var(--line) 12%, transparent);
+  --bg: oklch(0.205 0.012 75);
+  --bg-strong: oklch(0.245 0.014 75);
+  --canvas: oklch(0.185 0.012 75);
+  --surface: oklch(0.238 0.014 75);
+  --surface-raised: oklch(0.278 0.016 76);
+  --surface-soft: oklch(0.205 0.012 75);
+  --ink: oklch(0.94 0.012 85);
+  --ink-soft: oklch(0.86 0.014 85);
+  --muted: oklch(0.7 0.016 80);
+  --muted-strong: oklch(0.82 0.014 82);
+  --line: oklch(0.345 0.016 75);
+  --line-strong: oklch(0.46 0.018 75);
+  --primary: oklch(0.74 0.1 168);
+  --primary-strong: oklch(0.84 0.085 168);
+  --primary-soft: oklch(0.34 0.05 168);
+  --on-primary: oklch(0.2 0.02 75);
+  --accent: oklch(0.8 0.11 78);
+  --accent-soft: oklch(0.33 0.05 70);
+  --on-accent: oklch(0.2 0.02 70);
+  --signal: oklch(0.78 0.1 65);
+  --signal-soft: oklch(0.32 0.05 55);
+  --danger: oklch(0.7 0.15 25);
+  --danger-soft: oklch(0.3 0.08 20);
+  --warning: oklch(0.8 0.1 75);
+  --warning-soft: oklch(0.3 0.06 60);
+  --success: oklch(0.78 0.11 158);
+  --success-soft: oklch(0.3 0.06 160);
+  --sidebar-ink: oklch(0.95 0.01 85);
+  --sidebar-line: oklch(0.32 0.016 75);
+  --shadow: 0 28px 58px oklch(0.12 0.01 75 / 0.45);
+  --shadow-soft: 0 10px 26px oklch(0.12 0.01 75 / 0.3);
+  --grid-line: color-mix(in srgb, var(--line) 14%, transparent);
   color-scheme: dark;
 }
 
@@ -144,54 +147,58 @@ label[role="button"]:focus-visible {
 }
 
 .contrast-high {
-  --bg: #ffffff;
-  --bg-strong: #f8fafc;
-  --canvas: #f8fafc;
-  --surface: #ffffff;
-  --surface-raised: #ffffff;
-  --surface-soft: #f1f5f9;
-  --ink: #020617;
-  --ink-soft: #0f172a;
-  --muted: #1e293b;
-  --muted-strong: #0f172a;
-  --line: #cbd5e1;
-  --line-strong: #475569;
-  --primary: #3730a3;
-  --primary-strong: #1e1b4b;
-  --primary-soft: #eef2ff;
-  --accent: #047857;
-  --accent-soft: #ecfdf5;
-  --danger: #9f1239;
-  --danger-soft: #ffe4e6;
-  --warning: #78350f;
-  --warning-soft: #fef3c7;
-  --shadow: 0 14px 34px rgba(15, 23, 42, 0.08), 0 0 0 1px var(--line);
+  --bg: oklch(0.995 0.003 84);
+  --bg-strong: oklch(0.975 0.006 84);
+  --canvas: oklch(0.985 0.004 84);
+  --surface: oklch(1 0 0);
+  --surface-raised: oklch(1 0 0);
+  --surface-soft: oklch(0.965 0.008 84);
+  --ink: oklch(0.18 0.015 68);
+  --ink-soft: oklch(0.26 0.018 68);
+  --muted: oklch(0.36 0.02 70);
+  --muted-strong: oklch(0.26 0.02 70);
+  --line: oklch(0.82 0.015 80);
+  --line-strong: oklch(0.55 0.02 78);
+  --primary: oklch(0.37 0.09 165);
+  --primary-strong: oklch(0.27 0.075 167);
+  --primary-soft: oklch(0.93 0.035 165);
+  --on-primary: oklch(0.995 0.003 84);
+  --accent: oklch(0.62 0.13 70);
+  --accent-soft: oklch(0.92 0.05 80);
+  --on-accent: oklch(0.18 0.03 60);
+  --danger: oklch(0.48 0.18 23);
+  --danger-soft: oklch(0.93 0.04 25);
+  --warning: oklch(0.5 0.12 60);
+  --warning-soft: oklch(0.92 0.05 75);
+  --shadow: 0 14px 34px oklch(0.3 0.02 70 / 0.1), 0 0 0 1px var(--line);
   --shadow-soft: 0 0 0 1px var(--line);
   --grid-line: color-mix(in srgb, var(--line) 4%, transparent);
 }
 
 .theme-dark.contrast-high {
-  --bg: #020617;
-  --bg-strong: #0f172a;
-  --canvas: #0b1120;
-  --surface: #0f172a;
-  --surface-raised: #111827;
-  --surface-soft: #1e293b;
-  --ink: #ffffff;
-  --ink-soft: #f8fafc;
-  --muted: #e2e8f0;
-  --muted-strong: #f8fafc;
-  --line: #64748b;
-  --line-strong: #cbd5e1;
-  --primary: #c4b5fd;
-  --primary-strong: #ddd6fe;
-  --primary-soft: #312e81;
-  --accent: #fde68a;
-  --accent-soft: #451a03;
-  --danger: #fecdd3;
-  --danger-soft: #4c0519;
-  --warning: #fde68a;
-  --warning-soft: #451a03;
+  --bg: oklch(0.14 0.01 75);
+  --bg-strong: oklch(0.2 0.012 75);
+  --canvas: oklch(0.12 0.01 75);
+  --surface: oklch(0.19 0.012 75);
+  --surface-raised: oklch(0.22 0.014 76);
+  --surface-soft: oklch(0.24 0.014 75);
+  --ink: oklch(0.985 0.005 85);
+  --ink-soft: oklch(0.93 0.01 85);
+  --muted: oklch(0.8 0.014 82);
+  --muted-strong: oklch(0.9 0.012 84);
+  --line: oklch(0.5 0.018 75);
+  --line-strong: oklch(0.7 0.018 75);
+  --primary: oklch(0.82 0.1 168);
+  --primary-strong: oklch(0.9 0.08 168);
+  --primary-soft: oklch(0.32 0.05 168);
+  --on-primary: oklch(0.14 0.02 75);
+  --accent: oklch(0.86 0.11 80);
+  --accent-soft: oklch(0.3 0.05 70);
+  --on-accent: oklch(0.16 0.02 70);
+  --danger: oklch(0.78 0.14 25);
+  --danger-soft: oklch(0.3 0.08 20);
+  --warning: oklch(0.86 0.1 75);
+  --warning-soft: oklch(0.3 0.06 60);
   --grid-line: color-mix(in srgb, var(--line) 9%, transparent);
 }
 
@@ -281,7 +288,7 @@ label[role="button"]:focus-visible {
 
 .appNav button.active {
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   border-color: var(--primary);
   box-shadow: 0 10px 22px color-mix(in srgb, var(--primary) 18%, transparent);
 }
@@ -289,7 +296,7 @@ label[role="button"]:focus-visible {
 @media (hover: hover) and (pointer: fine) {
   .appNav button:hover {
     background: var(--primary);
-    color: #ffffff;
+    color: var(--on-primary);
     border-color: var(--primary);
     box-shadow: 0 1px 2px color-mix(in srgb, var(--primary) 22%, transparent);
   }
@@ -399,7 +406,7 @@ label[role="button"]:focus-visible {
 .personaSwitch button.active,
 .personaSwitch button[aria-pressed="true"] {
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .iconButton {
@@ -548,7 +555,7 @@ dt,
 
 .connectionBanner button:hover {
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .artifact,
@@ -955,7 +962,7 @@ dt,
 
 .flowStep.complete > span {
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .flowStep.current {
@@ -965,7 +972,7 @@ dt,
 
 .flowStep.current > span {
   background: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
 }
 
 .railHeader {
@@ -1087,7 +1094,7 @@ dt,
 .conversationListHeader button {
   min-height: 38px;
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   padding: 0 12px;
   font-size: 13px;
   font-weight: 650;
@@ -1290,7 +1297,7 @@ dt,
 .miniUploadAction:hover {
   border-color: color-mix(in srgb, var(--primary) 52%, var(--line));
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   transform: translateY(-1px);
 }
 
@@ -1440,7 +1447,7 @@ dt,
   border-radius: 999px;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--primary) 94%, white), var(--primary-strong));
-  color: #ffffff;
+  color: var(--on-primary);
   padding: 0 13px;
   font-size: 12px;
   font-weight: 660;
@@ -1604,7 +1611,7 @@ dt,
 .answerNextSteps button:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--primary) 48%, var(--line));
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   transform: translateY(-1px);
 }
 
@@ -2175,7 +2182,7 @@ dt,
   justify-content: center;
   border-radius: 999px;
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   padding: 0 18px;
   font-weight: 720;
   box-shadow: 0 18px 34px color-mix(in srgb, var(--primary) 18%, transparent);
@@ -2317,7 +2324,7 @@ dt,
   border-color: color-mix(in srgb, var(--primary) 48%, var(--line));
   background:
     linear-gradient(180deg, var(--primary), var(--primary-strong));
-  color: #ffffff;
+  color: var(--on-primary);
   box-shadow: 0 18px 34px color-mix(in srgb, var(--primary) 16%, transparent);
   transform: translateY(-1px);
 }
@@ -2466,7 +2473,7 @@ dt,
 .paperWizard button {
   justify-self: end;
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .readerOpenButton,
@@ -2768,7 +2775,7 @@ dt,
   overscroll-behavior: contain;
   scrollbar-width: thin;
   text-align: left;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #ffffff 36%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--surface-raised) 60%, transparent);
 }
 
 .practiceCard.revealed {
@@ -2829,7 +2836,7 @@ dt,
 .practiceControls button.primary {
   border-color: color-mix(in srgb, var(--primary) 36%, var(--line));
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .practiceControls button.iconOnly {
@@ -2865,7 +2872,7 @@ dt,
 .studyActionDeck button.primary {
   border-color: color-mix(in srgb, var(--primary) 36%, var(--line));
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .studyActionDeck button:disabled {
@@ -2875,7 +2882,7 @@ dt,
 
 .readerOpenButton.primary {
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   box-shadow: 0 16px 30px color-mix(in srgb, var(--primary) 18%, transparent);
 }
 
@@ -3043,14 +3050,14 @@ dt,
 }
 
 .readerMode {
-  --reader-bg: #f7f5ee;
-  --reader-paper: #fffefa;
-  --reader-ink: #182236;
-  --reader-muted: #5f6b64;
-  --reader-line: #ddd8ca;
-  --reader-chip: #f0eee6;
-  --reader-accent: #0b8f76;
-  --reader-accent-soft: #e1f4ef;
+  --reader-bg: oklch(0.955 0.018 85);
+  --reader-paper: oklch(0.985 0.012 85);
+  --reader-ink: oklch(0.26 0.02 65);
+  --reader-muted: oklch(0.47 0.02 68);
+  --reader-line: oklch(0.88 0.018 82);
+  --reader-chip: oklch(0.93 0.022 84);
+  --reader-accent: oklch(0.43 0.085 165);
+  --reader-accent-soft: oklch(0.92 0.035 165);
   min-height: calc(100vh - 128px);
   border: 1px solid var(--reader-line);
   border-radius: 24px;
@@ -3067,14 +3074,14 @@ dt,
 }
 
 .readerMode.dark {
-  --reader-bg: #101518;
-  --reader-paper: #182022;
-  --reader-ink: #f5f3ea;
-  --reader-muted: #b8c1b9;
-  --reader-line: #2c3736;
-  --reader-chip: #22302d;
-  --reader-accent: #66d8bf;
-  --reader-accent-soft: #123b35;
+  --reader-bg: oklch(0.205 0.012 75);
+  --reader-paper: oklch(0.25 0.014 76);
+  --reader-ink: oklch(0.93 0.012 85);
+  --reader-muted: oklch(0.72 0.016 80);
+  --reader-line: oklch(0.34 0.016 75);
+  --reader-chip: oklch(0.3 0.02 76);
+  --reader-accent: oklch(0.74 0.1 168);
+  --reader-accent-soft: oklch(0.34 0.05 168);
 }
 
 .readerTopbar {
@@ -3187,8 +3194,8 @@ dt,
 
 .readerBody pre {
   border-color: var(--reader-line);
-  background: #172033;
-  color: #f8fafc;
+  background: var(--reader-chip);
+  color: var(--reader-ink);
 }
 
 .readerBody hr {
@@ -3413,7 +3420,7 @@ dt,
 .preferenceToggle.active {
   border-color: color-mix(in srgb, var(--primary) 34%, var(--line));
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .preferenceToggle {
@@ -3448,7 +3455,7 @@ dt,
 .preferenceChoices button.active:hover,
 .preferenceToggle.active:hover {
   background: var(--primary-strong);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .readinessList {
@@ -3718,7 +3725,7 @@ dt,
   width: 100%;
   border-radius: 999px;
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   font-weight: 720;
 }
 
@@ -4252,7 +4259,7 @@ dd {
 
   .appNav button.active {
     background: var(--primary);
-    color: #ffffff;
+    color: var(--on-primary);
     border-color: var(--primary);
     box-shadow: 0 1px 2px color-mix(in srgb, var(--primary) 22%, transparent);
   }
@@ -4419,7 +4426,7 @@ dd {
   }
 
   .conversationListHeader button svg {
-    color: #ffffff;
+    color: var(--on-primary);
   }
 
   .materialStack {
@@ -5185,4 +5192,334 @@ dd {
     margin-bottom: 18px;
     padding-bottom: 14px;
   }
+}
+
+/* ============================================================
+   Source Constellation — the workspace "Ready" state.
+   A living spring-physics graph: the session core, the source
+   files orbiting it, and the threads that keep answers tied to
+   them. Fully themed, reduced-motion aware, touch-friendly.
+   ============================================================ */
+.sourceReadyState:has(.readyConstellation) {
+  width: min(640px, 100%);
+  padding: clamp(8px, 2vw, 20px) 0 4px;
+}
+
+.readyConstellation {
+  display: grid;
+  gap: 14px;
+  width: min(640px, 100%);
+  text-align: left;
+  --cst-flow-op: 0.4;
+  --cst-flow-speed: 4.6s;
+  --cst-pulse-speed: 3.8s;
+}
+
+.readyConstellation.is-active {
+  --cst-flow-op: 0.95;
+  --cst-flow-speed: 1.5s;
+  --cst-pulse-speed: 1.9s;
+}
+
+.rcLede {
+  display: grid;
+  gap: 6px;
+}
+
+.rcLede h3 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(23px, 2.6vw, 30px);
+  font-weight: 760;
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.rcLede p {
+  margin: 0;
+  max-width: 48ch;
+  color: var(--muted-strong);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.rcFigure {
+  width: 100%;
+  touch-action: pan-y;
+}
+
+.constellation {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* Threads: faint resting lines between core and each source. */
+.cst-thread {
+  fill: none;
+  stroke: color-mix(in srgb, var(--primary) 34%, var(--line));
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  opacity: 0;
+  animation: cstThreadIn 0.8s ease forwards;
+}
+
+/* Flow: a short bright segment that travels the thread, carrying
+   the sense of "this source is being read". pathLength=1 keeps the
+   dash rhythm identical regardless of the thread's real length. */
+.cst-flow {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 0.9;
+  opacity: var(--cst-flow-op);
+  transition: opacity 0.35s ease, stroke-width 0.35s ease;
+  animation: cstFlow var(--cst-flow-speed) linear infinite;
+}
+
+.readyConstellation.is-active .cst-flow {
+  stroke-width: 2.6;
+}
+
+.cst-node {
+  opacity: 0;
+  animation: cstNodeIn 0.55s ease forwards;
+}
+
+.cst-node-halo {
+  fill: color-mix(in srgb, var(--primary) 11%, transparent);
+  transition: fill 0.3s ease;
+}
+
+.readyConstellation.is-active .cst-node-halo {
+  fill: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.cst-node-disc {
+  fill: var(--surface-raised);
+  stroke: color-mix(in srgb, var(--primary) 52%, var(--line));
+  stroke-width: 1.5;
+  transition: stroke 0.3s ease;
+}
+
+.readyConstellation.is-active .cst-node-disc {
+  stroke: var(--primary);
+}
+
+.cst-node-num {
+  fill: var(--primary-strong);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Core: a surface chip, not a filled primary blob — keeps the
+   "Ask" label high-contrast in both light and dark themes. */
+.cst-core-disc {
+  fill: var(--surface-raised);
+  stroke: var(--primary);
+  stroke-width: 2;
+  filter: drop-shadow(0 10px 22px color-mix(in srgb, var(--primary) 18%, transparent));
+}
+
+.cst-core-pulse {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 1.4;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cstPulse var(--cst-pulse-speed) ease-out infinite;
+}
+
+.cst-core-label {
+  fill: var(--ink);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 720;
+  letter-spacing: 0.01em;
+}
+
+/* Guided moves — secondary, never all-primary. auto-fit means they
+   reflow to one column on a phone instead of overlapping. */
+.rcMoves {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.rcMove {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 11px;
+  align-items: center;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  text-align: left;
+  box-shadow: var(--shadow-soft);
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.rcMove svg {
+  grid-row: 1 / 3;
+  align-self: center;
+  color: var(--primary);
+}
+
+.rcMoveTitle {
+  grid-column: 2;
+  font-size: 14px;
+  font-weight: 680;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.rcMoveDetail {
+  grid-column: 2;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--muted-strong);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rcMove:hover {
+    border-color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 26px color-mix(in srgb, var(--primary) 14%, transparent);
+  }
+}
+
+/* Legend — the source-of-truth list of files; node badges mirror it. */
+.rcLegend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--muted-strong);
+}
+
+.rcLegendLead {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 680;
+  color: var(--muted);
+}
+
+.rcLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rcLegendItem b {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.rcLegendMore {
+  color: var(--muted);
+}
+
+@keyframes cstThreadIn {
+  to {
+    opacity: 0.8;
+  }
+}
+
+@keyframes cstNodeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cstFlow {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes cstPulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.5;
+  }
+  70% {
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cst-thread {
+    opacity: 0.7;
+    animation: none;
+  }
+  .cst-node {
+    opacity: 1;
+    animation: none;
+  }
+  .cst-flow {
+    opacity: 0;
+    animation: none;
+  }
+  .cst-core-pulse {
+    animation: none;
+    opacity: 0;
+  }
+  .rcMove {
+    transition: none;
+  }
+}
+
+/* ============================================================
+   Reading voice — Literata for the study content itself
+   (generated answers + reader prose). UI chrome stays in
+   Hanken Grotesk; what you actually *read* gets the book face.
+   ============================================================ */
+.chatMessage.assistant .richText,
+.chatMessage.assistant p,
+.chatMessage.assistant li,
+.readerBody,
+.readerBody p,
+.readerBody li,
+.readerBody blockquote {
+  font-family: var(--font-reading);
+}
+
+.chatMessage.assistant .richText p {
+  line-height: 1.62;
+  letter-spacing: -0.003em;
+}
+
+/* Light type on dark surfaces reads lighter — give it more air. */
+.theme-dark .chatMessage.assistant .richText p,
+.theme-dark .readerBody p {
+  line-height: 1.68;
 }
