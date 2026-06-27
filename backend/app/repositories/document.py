@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.models import (
@@ -117,6 +117,30 @@ class DocumentRepository:
             .order_by(DocumentIngestionJob.created_at.asc())
             .limit(1)
         ).first()
+
+    def claim_next_ingestion_job(self) -> DocumentIngestionJob | None:
+        """Atomically claim the oldest queued ingestion job.
+
+        Uses ``FOR UPDATE SKIP LOCKED`` so that concurrent workers never select
+        the same row; the job is flipped to ``running`` before the lock is
+        released, removing it from the queued pool. (SQLite ignores the locking
+        clause, which is fine for single-connection tests.)
+        """
+        job = self.db.scalars(
+            select(DocumentIngestionJob)
+            .where(DocumentIngestionJob.status == IngestionJobStatus.queued.value)
+            .order_by(DocumentIngestionJob.created_at.asc())
+            .with_for_update(skip_locked=True)
+            .limit(1)
+        ).first()
+        if job is None:
+            return None
+
+        job.status = IngestionJobStatus.running.value
+        job.started_at = datetime.now(UTC)
+        self.db.commit()
+        self.db.refresh(job)
+        return job
 
     def next_queued_document(self) -> Document | None:
         return self.db.scalars(

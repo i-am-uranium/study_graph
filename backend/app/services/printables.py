@@ -109,6 +109,11 @@ def next_queued_printable_job(db: Session) -> PrintableJob | None:
     return print_repo.next_queued_printable_job()
 
 
+def claim_next_printable_job(db: Session) -> PrintableJob | None:
+    print_repo = PrintableRepository(db)
+    return print_repo.claim_next_printable_job()
+
+
 def run_printable_job(
     db: Session,
     job_id: int,

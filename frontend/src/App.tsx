@@ -23,7 +23,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 
 import {
@@ -527,6 +527,10 @@ export default function App() {
   const [printableExports, setPrintableExports] = useState<Record<number, PrintableExport[]>>({});
   const [qaSessions, setQaSessions] = useState<QaSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+  // Auto-select the newest saved conversation only on the first load. After that,
+  // an intentional "new chat" (activeSessionId === null) must survive background
+  // refreshes so polling doesn't yank the user back into an old conversation.
+  const hasSeededSessionRef = useRef(false);
   const [activeMessages, setActiveMessages] = useState<ChatMessage[]>([]);
   const [readerArtifactId, setReaderArtifactId] = useState<number | null>(null);
   const [focusedArtifactId, setFocusedArtifactId] = useState<number | null>(null);
@@ -641,11 +645,18 @@ export default function App() {
       }
       setSettings(currentSettings);
       setQaSessions(savedSessions);
-      setActiveSessionId((current) =>
-        current && savedSessions.some((session) => session.id === current)
-          ? current
-          : savedSessions[0]?.id ?? null,
-      );
+      setActiveSessionId((current) => {
+        if (current && savedSessions.some((session) => session.id === current)) {
+          return current;
+        }
+        // Seed the newest conversation only once, on the first load. Afterwards,
+        // preserve an intentional new chat (null) instead of snapping back.
+        if (!hasSeededSessionRef.current) {
+          hasSeededSessionRef.current = true;
+          return savedSessions[0]?.id ?? null;
+        }
+        return null;
+      });
     } catch (exc) {
       setError(userMessageFromError(exc));
       setDocuments([]);
@@ -666,9 +677,11 @@ export default function App() {
     setQaSessions(savedSessions);
     setActiveSessionId((current) => {
       const nextSessionId = preferredSessionId ?? current;
+      // Keep the chosen/just-saved session if it still exists; otherwise preserve
+      // an intentional new chat (null) rather than snapping to the newest session.
       return nextSessionId && savedSessions.some((session) => session.id === nextSessionId)
         ? nextSessionId
-        : savedSessions[0]?.id ?? null;
+        : null;
     });
   }
 
@@ -805,6 +818,9 @@ export default function App() {
     setActiveSessionId(null);
     setActiveMessages([]);
     setQuestion("");
+    // Start from a clean context (empty = all ready materials in scope) so the
+    // new chat doesn't inherit the previous conversation's document selection.
+    setSelectedIds([]);
   }
 
   function toggleAppTheme() {

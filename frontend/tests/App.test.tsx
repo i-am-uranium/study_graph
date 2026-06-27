@@ -744,6 +744,104 @@ describe("App", () => {
     });
   });
 
+  it("keeps a new chat fresh when a background poll fires", async () => {
+    const intervalHandlers: TimerHandler[] = [];
+    vi.spyOn(window, "setInterval").mockImplementation((handler: TimerHandler, timeout?: number) => {
+      if (timeout === 3000) {
+        intervalHandlers.push(handler);
+      }
+      return 1;
+    });
+    vi.spyOn(window, "clearInterval").mockImplementation(() => undefined);
+    stubApi(true, {
+      // A document still ingesting keeps the 3s poll active.
+      documents: [
+        {
+          id: 1,
+          filename: "production_rag_quiz.pdf",
+          content_type: "application/pdf",
+          status: "queued",
+          error_message: null,
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:00:00Z",
+        },
+      ],
+      ingestionJobs: [
+        {
+          id: 41,
+          document_id: 1,
+          status: "running",
+          error_message: null,
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:00:00Z",
+          started_at: "2026-06-12T00:00:01Z",
+          completed_at: null,
+        },
+      ],
+      qaSessions: [
+        {
+          id: 5,
+          title: "What is RAG?",
+          selected_document_ids: [1],
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:01:00Z",
+          message_count: 2,
+          last_message: "RAG uses retrieval to ground answers.",
+        },
+      ],
+      qaSessionDetails: {
+        5: {
+          id: 5,
+          title: "What is RAG?",
+          selected_document_ids: [1],
+          created_at: "2026-06-12T00:00:00Z",
+          updated_at: "2026-06-12T00:01:00Z",
+          messages: [
+            {
+              id: 2,
+              session_id: 5,
+              role: "assistant",
+              content: "RAG uses retrieval to ground answers.",
+              citations: [],
+              confidence_notes: [],
+              created_at: "2026-06-12T00:01:00Z",
+            },
+          ],
+        },
+      },
+    });
+    render(<App />);
+
+    clickPrimaryNav("Workspace");
+
+    // The newest conversation is auto-selected on first load.
+    const savedConversation = await screen.findByRole("button", {
+      name: "Open conversation: What is RAG?",
+    });
+    await waitFor(() => expect(savedConversation).toHaveClass("active"));
+    await waitFor(() => {
+      expect(intervalHandlers.length).toBeGreaterThan(0);
+    });
+
+    // Start a fresh chat — the old conversation should deselect.
+    fireEvent.click(screen.getByRole("button", { name: "New" }));
+    expect(savedConversation).not.toHaveClass("active");
+
+    // A background poll must NOT yank the user back into the old conversation.
+    await act(async () => {
+      const handler = intervalHandlers[intervalHandlers.length - 1];
+      if (typeof handler === "function") {
+        handler();
+      }
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Open conversation: What is RAG?" }),
+      ).not.toHaveClass("active");
+    });
+  });
+
   it("opens an existing summary instead of requesting generation again", async () => {
     const fetchMock = stubApi(true, {
       documents: [
