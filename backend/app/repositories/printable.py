@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -51,6 +51,28 @@ class PrintableRepository:
             .limit(1)
         ).first()
 
+    def claim_next_printable_job(self) -> PrintableJob | None:
+        """Atomically claim the oldest queued printable job.
+
+        Mirrors ``DocumentRepository.claim_next_ingestion_job`` — ``FOR UPDATE
+        SKIP LOCKED`` keeps concurrent workers from grabbing the same job.
+        """
+        job = self.db.scalars(
+            select(PrintableJob)
+            .where(PrintableJob.status == PrintableJobStatus.queued.value)
+            .order_by(PrintableJob.created_at.asc())
+            .with_for_update(skip_locked=True)
+            .limit(1)
+        ).first()
+        if job is None:
+            return None
+
+        job.status = PrintableJobStatus.running.value
+        job.started_at = datetime.now(UTC)
+        self.db.commit()
+        self.db.refresh(job)
+        return job
+
     def update_job_status(
         self,
         job_id: int,
@@ -82,7 +104,6 @@ class PrintableRepository:
         self.db.commit()
 
     def mark_failed(self, job: PrintableJob, error_message: str, printable: PrintableSet | None = None) -> None:
-        from datetime import UTC
         job.status = PrintableJobStatus.failed.value
         job.error_message = error_message
         job.completed_at = datetime.now(UTC)

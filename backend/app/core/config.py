@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
 
     worker_poll_seconds: float = 5.0
+    worker_concurrency: int = 4
     log_level: str = "INFO"
 
     @field_validator("upload_dir", mode="before")

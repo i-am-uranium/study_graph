@@ -116,6 +116,11 @@ def next_queued_ingestion_job(db: Session) -> DocumentIngestionJob | None:
     return repo.next_queued_ingestion_job()
 
 
+def claim_next_ingestion_job(db: Session) -> DocumentIngestionJob | None:
+    repo = DocumentRepository(db)
+    return repo.claim_next_ingestion_job()
+
+
 def next_queued_document(db: Session) -> Document | None:
     repo = DocumentRepository(db)
     return repo.next_queued_document()
