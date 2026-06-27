@@ -17,3 +17,5 @@ frontend/vite.config.js
 frontend/vite.config.d.ts
 __pycache__/
 *.py[cod]
+.playwright-mcp/
+docs/superpowers/

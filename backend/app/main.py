@@ -1,4 +1,4 @@
-from app.api import documents, printables, qa, settings, study
+from app.api import dashboard, documents, printables, qa, settings, study
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 from fastapi import FastAPI
@@ -27,6 +27,7 @@ def create_app() -> FastAPI:
     app.include_router(qa.router)
     app.include_router(study.router)
     app.include_router(printables.router)
+    app.include_router(dashboard.router)
     return app
 
 
