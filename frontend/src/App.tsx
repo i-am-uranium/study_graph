@@ -1,9 +1,10 @@
 import {
   Accessibility,
-  ArrowRight,
   AlertTriangle,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
   ClipboardList,
   Clock3,
   FileStack,
@@ -11,14 +12,14 @@ import {
   HelpCircle,
   Layers,
   Loader2,
+  MessageSquare,
   Moon,
-  Network,
   Plus,
   RefreshCcw,
   Send,
-  Settings,
   Sparkles,
   Sun,
+  Trash2,
   Type,
   Upload,
   X,
@@ -32,6 +33,8 @@ import {
   createFlashcards,
   createPrintable,
   createSummary,
+  deleteDocument,
+  deleteQaSession,
   exportPrintable,
   getQaSession,
   ingestDocument,
@@ -47,7 +50,6 @@ import {
   uploadDocument,
 } from "./api";
 import { RichText } from "./RichText";
-import SourceConstellation from "./SourceConstellation";
 import type {
   IngestionJob,
   PrintableExport,
@@ -64,8 +66,13 @@ import type {
 type Tab = "rag" | "study" | "printables" | "settings";
 type ArtifactKind = "summary" | "flashcards";
 type AppTheme = "light" | "dark";
-type UserPersona = "student" | "teacher" | "admin";
 type TextScale = "standard" | "comfortable" | "large";
+type MobileView = "files" | "read" | "chat";
+type LibrarySection = "documents" | "conversations";
+type PendingDelete =
+  | null
+  | { type: "document"; id: number; name: string }
+  | { type: "conversation"; id: number; name: string };
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -82,174 +89,34 @@ type AppearanceSettings = {
   textScale: TextScale;
 };
 
-const tabs: Array<{ id: Tab; label: string; icon: typeof FileText }> = [
-  { id: "rag", label: "Workspace", icon: HelpCircle },
-  { id: "study", label: "Study Sets", icon: Layers },
-  { id: "printables", label: "Papers", icon: ClipboardList },
-  { id: "settings", label: "Settings", icon: Settings },
+const tabs: Array<{ id: Tab; label: string }> = [
+  { id: "rag", label: "Workspace" },
+  { id: "study", label: "Study Sets" },
+  { id: "printables", label: "Papers" },
+  { id: "settings", label: "Settings" },
 ];
 
-const personas: Array<{ id: UserPersona; label: string }> = [
-  { id: "student", label: "Student" },
-  { id: "teacher", label: "Teacher" },
-  { id: "admin", label: "Admin" },
+// Teacher-first guided prompts. These power the chat suggestion chips. There is no
+// student/teacher/admin mode switch — the workspace is teacher-first by default.
+type StudyMode = { id: string; title: string; prompt: string };
+const studyModes: StudyMode[] = [
+  {
+    id: "check",
+    title: "Check understanding",
+    prompt: "Create five checks for understanding with answer guidance.",
+  },
+  { id: "example", title: "Give example", prompt: "Give a concrete example from this material." },
+  {
+    id: "exit",
+    title: "Create exit ticket",
+    prompt: "Create a short exit ticket for this material.",
+  },
+  {
+    id: "compare",
+    title: "Compare key ideas",
+    prompt: "Compare the key ideas or approaches in this material.",
+  },
 ];
-
-type StudyMode = {
-  id: string;
-  title: string;
-  detail: string;
-  prompt?: string;
-  artifactKind?: ArtifactKind;
-  icon: typeof FileText;
-};
-
-type WorkspaceMission =
-  | {
-      action: "upload";
-      actionLabel: string;
-      detail: string;
-      meta: string;
-      stage: string;
-      title: string;
-      tone: "start" | "prepare" | "work" | "review";
-    }
-  | {
-      action: "prepare";
-      actionLabel: string;
-      detail: string;
-      disabled: boolean;
-      documentId: number;
-      meta: string;
-      stage: string;
-      title: string;
-      tone: "start" | "prepare" | "work" | "review";
-    }
-  | {
-      action: "prompt";
-      actionLabel: string;
-      detail: string;
-      meta: string;
-      prompt: string;
-      stage: string;
-      title: string;
-      tone: "start" | "prepare" | "work" | "review";
-    }
-  | {
-      action: "artifact";
-      actionLabel: string;
-      artifactKind: ArtifactKind;
-      detail: string;
-      disabled: boolean;
-      documentId: number;
-      meta: string;
-      stage: string;
-      title: string;
-      tone: "start" | "prepare" | "work" | "review";
-    }
-  | {
-      action: "openArtifact";
-      actionLabel: string;
-      artifactId: number;
-      detail: string;
-      meta: string;
-      stage: string;
-      title: string;
-      tone: "start" | "prepare" | "work" | "review";
-    };
-
-const personaStudyModes: Record<UserPersona, StudyMode[]> = {
-  student: [
-    {
-      id: "student-explain",
-      title: "Explain",
-      detail: "Plain-language walkthrough",
-      prompt: "Explain the main ideas in simple language.",
-      icon: BookOpen,
-    },
-    {
-      id: "student-practice",
-      title: "Practice",
-      detail: "Active recall questions",
-      prompt: "Quiz me on the most important points.",
-      icon: HelpCircle,
-    },
-    {
-      id: "student-plan",
-      title: "Plan",
-      detail: "10-minute revision path",
-      prompt: "Make a 10-minute revision plan.",
-      icon: Clock3,
-    },
-    {
-      id: "student-flashcards",
-      title: "Flashcards",
-      detail: "Create a review deck",
-      artifactKind: "flashcards",
-      icon: Layers,
-    },
-  ],
-  teacher: [
-    {
-      id: "teacher-brief",
-      title: "Lesson brief",
-      detail: "Objectives and key points",
-      artifactKind: "summary",
-      icon: ClipboardList,
-    },
-    {
-      id: "teacher-check",
-      title: "Check understanding",
-      detail: "Questions with answers",
-      prompt: "Create five checks for understanding with answer guidance.",
-      icon: CheckCircle2,
-    },
-    {
-      id: "teacher-exit",
-      title: "Exit ticket",
-      detail: "Quick end-of-class prompt",
-      prompt: "Create a short exit ticket for this material.",
-      icon: FileText,
-    },
-    {
-      id: "teacher-cards",
-      title: "Review deck",
-      detail: "Flashcards for practice",
-      artifactKind: "flashcards",
-      icon: Layers,
-    },
-  ],
-  admin: [
-    {
-      id: "admin-pulse",
-      title: "Class pulse",
-      detail: "What needs attention",
-      prompt: "Summarize likely progress signals and support needs from this learning material.",
-      icon: FileStack,
-    },
-    {
-      id: "admin-gaps",
-      title: "Gap scan",
-      detail: "Find weak spots",
-      prompt: "Identify prerequisite gaps and misconceptions learners may have with this material.",
-      icon: Network,
-    },
-    {
-      id: "admin-plan",
-      title: "Support plan",
-      detail: "Next steps for groups",
-      prompt: "Create a simple support plan for students who are ahead, on track, or stuck.",
-      icon: ClipboardList,
-    },
-    {
-      id: "admin-summary",
-      title: "Briefing",
-      detail: "Shareable overview",
-      artifactKind: "summary",
-      icon: BookOpen,
-    },
-  ],
-};
 
 const SAMPLE_DOCUMENT_ID = -1001;
 const SAMPLE_NOW = "2026-06-14T00:00:00Z";
@@ -311,9 +178,22 @@ function isTextScale(value: unknown): value is TextScale {
   return value === "standard" || value === "comfortable" || value === "large";
 }
 
+function prefersDarkTheme(): boolean {
+  try {
+    return (
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+    );
+  } catch {
+    return false;
+  }
+}
+
 function readAppearanceSettings(): AppearanceSettings {
+  // Respect the system preference on first load; fall back gracefully if storage is blocked.
   const fallback: AppearanceSettings = {
-    appTheme: "light",
+    appTheme: prefersDarkTheme() ? "dark" : "light",
     highContrast: false,
     textScale: "standard",
   };
@@ -462,6 +342,15 @@ function artifactDisplayTitle(artifact: StudyArtifact) {
   return cleaned;
 }
 
+function documentDisplayTitle(filename: string) {
+  const cleaned = filename
+    .replace(/\.(pdf|docx|md|markdown|txt)$/i, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || filename;
+}
+
 function paperOutputTypeLabel(value: string) {
   if (value === "question_paper") return "Question paper";
   if (value === "worksheet_pack") return "Worksheet pack";
@@ -539,7 +428,6 @@ export default function App() {
   const [practiceRevealed, setPracticeRevealed] = useState(false);
   const [practiceMasteredCount, setPracticeMasteredCount] = useState(0);
   const [appTheme, setAppTheme] = useState<AppTheme>(initialAppearance.appTheme);
-  const [persona, setPersona] = useState<UserPersona>("teacher");
   const [highContrast, setHighContrast] = useState(initialAppearance.highContrast);
   const [textScale, setTextScale] = useState<TextScale>(initialAppearance.textScale);
   const [settings, setSettings] = useState<SettingsRead | null>(null);
@@ -559,6 +447,19 @@ export default function App() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploadDragActive, setUploadDragActive] = useState(false);
+
+  // Workspace UI state for the redesigned three-zone studio.
+  const [isLibraryCollapsed, setIsLibraryCollapsed] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState<Record<LibrarySection, boolean>>({
+    documents: false,
+    conversations: false,
+  });
+  const [mobileView, setMobileView] = useState<MobileView>("read");
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
+
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const newThreadRef = useRef<HTMLButtonElement | null>(null);
+  const confirmDeleteRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     void refresh();
@@ -584,6 +485,20 @@ export default function App() {
       setPaperDocumentId(documents.find((document) => document.status === "ready")?.id ?? "");
     }
   }, [documents, paperDocumentId]);
+
+  // Close the delete confirmation on Escape, and move focus to the destructive action
+  // when the dialog opens so keyboard users land on it.
+  useEffect(() => {
+    if (!pendingDelete) return;
+    confirmDeleteRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPendingDelete(null);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [pendingDelete]);
 
   const hasPendingIngestion = useMemo(
     () =>
@@ -821,6 +736,18 @@ export default function App() {
     // Start from a clean context (empty = all ready materials in scope) so the
     // new chat doesn't inherit the previous conversation's document selection.
     setSelectedIds([]);
+    setMobileView("chat");
+  }
+
+  function openConversation(sessionId: number) {
+    setActiveSessionId(sessionId);
+    setMobileView("chat");
+  }
+
+  function selectDocument(document: StudyDocument) {
+    if (document.status !== "ready") return;
+    setSelectedIds([document.id]);
+    setMobileView("read");
   }
 
   function toggleAppTheme() {
@@ -833,11 +760,76 @@ export default function App() {
     );
   }
 
-  async function onArtifact(kind: ArtifactKind, documentId: number) {
+  function toggleLibrary() {
+    setIsLibraryCollapsed((current) => !current);
+  }
+
+  function toggleSection(section: LibrarySection) {
+    setCollapsedSections((current) => ({ ...current, [section]: !current[section] }));
+  }
+
+  function expandLibraryTo(section: LibrarySection) {
+    setIsLibraryCollapsed(false);
+    setCollapsedSections((current) => ({ ...current, [section]: false }));
+  }
+
+  function requestDeleteDocument(document: StudyDocument) {
+    setPendingDelete({ type: "document", id: document.id, name: document.filename });
+  }
+
+  function requestDeleteConversation(session: QaSession) {
+    setPendingDelete({ type: "conversation", id: session.id, name: session.title });
+  }
+
+  async function confirmPendingDelete() {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    setPendingDelete(null);
+
+    if (target.type === "document") {
+      // Sample/local-only material has a negative id and never reaches the backend.
+      try {
+        if (target.id >= 0) {
+          await deleteDocument(target.id);
+        }
+        setDocuments((current) => current.filter((document) => document.id !== target.id));
+        setSelectedIds((current) => current.filter((id) => id !== target.id));
+        setArtifacts((current) =>
+          current.filter((artifact) => artifact.document_id !== target.id),
+        );
+        if (paperDocumentId === target.id) {
+          setPaperDocumentId("");
+        }
+      } catch (exc) {
+        setError(userMessageFromError(exc));
+      }
+      return;
+    }
+
+    try {
+      if (target.id >= 0) {
+        await deleteQaSession(target.id);
+      }
+      setQaSessions((current) => current.filter((session) => session.id !== target.id));
+      if (activeSessionId === target.id) {
+        setActiveSessionId(null);
+        setActiveMessages([]);
+      }
+    } catch (exc) {
+      setError(userMessageFromError(exc));
+    }
+  }
+
+  // `openInReader` controls whether a created/opened artifact takes over the
+  // Study Sets reader. The Workspace "Create a brief" action keeps the user in
+  // place — the brief simply renders in the center reading pane.
+  async function onArtifact(kind: ArtifactKind, documentId: number, openInReader = true) {
     const existingArtifact = artifactByDocumentAndType.get(artifactKey(documentId, kind));
     if (existingArtifact) {
-      setReaderArtifactId(existingArtifact.id);
-      setActiveTab("study");
+      if (openInReader) {
+        setReaderArtifactId(existingArtifact.id);
+        setActiveTab("study");
+      }
       return;
     }
 
@@ -856,8 +848,10 @@ export default function App() {
       const artifact =
         kind === "summary" ? await createSummary(documentId) : await createFlashcards(documentId);
       setArtifacts((current) => [artifact, ...current]);
-      setReaderArtifactId(artifact.id);
-      setActiveTab("study");
+      if (openInReader) {
+        setReaderArtifactId(artifact.id);
+        setActiveTab("study");
+      }
     } catch (exc) {
       setError(userMessageFromError(exc));
     } finally {
@@ -991,6 +985,7 @@ export default function App() {
     setQuestion("");
     setPaperDocumentId("");
     setReaderArtifactId(null);
+    setMobileView("read");
     resetViewportScroll();
   }
 
@@ -1043,64 +1038,29 @@ export default function App() {
   const providerMissing = settings !== null && !providerReady;
   const providerSetupMessage = "Connect learning support before using this action.";
   const connectionMissing = error === "StudyGraph is not connected. Start StudyGraph, then refresh.";
-  const isSampleWorkspace = documents.some((document) => document.id === SAMPLE_DOCUMENT_ID);
-
   const themeToggleLabel = appTheme === "light" ? "Dark mode" : "Light mode";
   const contrastToggleLabel = highContrast ? "Standard contrast" : "High contrast";
-  const draftPrintableCount = printables.filter(
-    (printable) => printable.status === "draft_ready" || printable.status === "export_ready",
-  ).length;
-  const activeTabLabel =
-    activeTab === "rag" ? "Workspace" : (tabs.find((tab) => tab.id === activeTab)?.label ?? "Workspace");
   const selectedReadyDocuments = readyDocuments.filter((document) =>
     selectedIds.includes(document.id),
   );
   const activeContextDocuments =
     selectedReadyDocuments.length > 0 ? selectedReadyDocuments : readyDocuments;
-  const hasCreatedOutput = artifacts.length > 0 || draftPrintableCount > 0;
-  const workspaceFlow = [
-    {
-      label: "Add",
-      state: documents.length > 0 ? "done" : "current",
-    },
-    {
-      label: "Prepare",
-      state:
-        readyDocuments.length > 0
-          ? "done"
-          : documents.length > 0
-            ? "current"
-            : "waiting",
-    },
-    {
-      label: "Ask",
-      state:
-        activeMessages.length > 0 || hasCreatedOutput
-          ? "done"
-          : readyDocuments.length > 0
-            ? "current"
-            : "waiting",
-    },
-    {
-      label: "Create",
-      state:
-        hasCreatedOutput
-          ? "done"
-          : activeMessages.length > 0
-            ? "current"
-            : "waiting",
-    },
-  ];
-  const activePersonaModes = personaStudyModes[persona];
+
+  // The center reading area is anchored to a single "active" document.
+  const activeDocument = activeContextDocuments[0] ?? readyDocuments[0] ?? null;
+  const activeSummaryArtifact = activeDocument
+    ? artifactByDocumentAndType.get(artifactKey(activeDocument.id, "summary"))
+    : undefined;
+  const activeFlashcardsArtifact = activeDocument
+    ? artifactByDocumentAndType.get(artifactKey(activeDocument.id, "flashcards"))
+    : undefined;
+  const lastAssistantMessage =
+    [...activeMessages].reverse().find((message) => message.role === "assistant") ?? null;
+  const lastAnswerSources = lastAssistantMessage
+    ? uniqueCitationSourceNames(lastAssistantMessage.citations)
+    : [];
   const firstUnreadyDocument = documents.find((document) => document.status !== "ready") ?? null;
-  const missionDocument = activeContextDocuments[0] ?? readyDocuments[0] ?? null;
-  const missionSummaryArtifact = missionDocument
-    ? artifactByDocumentAndType.get(artifactKey(missionDocument.id, "summary"))
-    : undefined;
-  const missionFlashcardsArtifact = missionDocument
-    ? artifactByDocumentAndType.get(artifactKey(missionDocument.id, "flashcards"))
-    : undefined;
-  const firstSavedArtifact = artifacts[0] ?? null;
+
   const focusedStudyArtifact =
     artifacts.find((artifact) => artifact.id === focusedArtifactId) ?? artifacts[0] ?? null;
   const focusedStudySource = focusedStudyArtifact
@@ -1121,181 +1081,9 @@ export default function App() {
   const practiceRemaining = Math.max(practiceTotal - practiceCurrent, 0);
   const practicePercent = practiceTotal > 0 ? Math.round((practiceCurrent / practiceTotal) * 100) : 0;
   const practiceCue = practiceRevealed ? "Rate recall" : "Try recall first";
-  const firstPromptMode = activePersonaModes.find((mode) => mode.prompt);
-  const composerPromptModes = activePersonaModes.filter((mode) => mode.prompt);
-  const personaModeLabel =
-    persona === "student"
-      ? "Study modes"
-      : persona === "teacher"
-        ? "Teaching modes"
-        : "Oversight modes";
-  const firstUnreadyJob = firstUnreadyDocument
-    ? latestJobByDocumentId.get(firstUnreadyDocument.id)
-    : undefined;
-  const firstUnreadyHasActiveJob =
-    firstUnreadyJob?.status === "queued" ||
-    firstUnreadyJob?.status === "running" ||
-    firstUnreadyDocument?.status === "queued" ||
-    firstUnreadyDocument?.status === "ingesting";
-  const preferredArtifactKind: ArtifactKind = persona === "student" ? "flashcards" : "summary";
-  const preferredExistingArtifact =
-    preferredArtifactKind === "summary" ? missionSummaryArtifact : missionFlashcardsArtifact;
-  const workspaceMission: WorkspaceMission =
-    documents.length === 0
-      ? {
-          action: "upload",
-          actionLabel: "Upload file",
-          detail: "Drop in notes, a worksheet, or a lesson file.",
-          meta: "PDF, DOCX, TXT, or Markdown",
-          stage: "Next",
-          title: "Start with a file",
-          tone: "start",
-        }
-      : readyDocuments.length === 0 && firstUnreadyDocument
-        ? {
-            action: "prepare",
-            actionLabel: firstUnreadyHasActiveJob ? "Preparing" : "Prepare material",
-            detail: "The file is uploaded. Prepare it once, then ask anything.",
-            disabled: !providerReady || firstUnreadyHasActiveJob,
-            documentId: firstUnreadyDocument.id,
-            meta: firstUnreadyHasActiveJob
-              ? "Preparation is already in progress"
-              : providerReady
-                ? "One click, then it is ready to use"
-                : providerSetupMessage,
-            stage: "Next",
-            title: "Prepare the file",
-            tone: "prepare",
-          }
-        : firstSavedArtifact && hasCreatedOutput
-          ? {
-              action: "openArtifact",
-              actionLabel: `Open ${artifactTypeLabel(firstSavedArtifact.artifact_type).toLowerCase()}`,
-              artifactId: firstSavedArtifact.id,
-              detail: "Saved work is ready to review.",
-              meta: "Saved study set",
-              stage: "Next",
-              title: "Review saved work",
-              tone: "review",
-            }
-          : activeMessages.length > 0 && missionDocument
-            ? {
-                action: "artifact",
-                actionLabel: preferredArtifactKind === "summary" ? "Create summary" : "Create flashcards",
-                artifactKind: preferredArtifactKind,
-                detail:
-                  preferredArtifactKind === "summary"
-                    ? "Save the useful parts as a teaching brief."
-                    : "Save the useful parts as quick practice.",
-                disabled:
-                  !providerReady ||
-                  missionDocument.id < 0 ||
-                  busy === `${preferredArtifactKind}-${missionDocument.id}`,
-                documentId: missionDocument.id,
-                meta:
-                  missionDocument.id < 0
-                    ? "Upload your own file to create a new study set"
-                    : providerReady
-                      ? missionDocument.filename
-                      : providerSetupMessage,
-                stage: "Next",
-                title: "Create from this",
-                tone: "work",
-              }
-            : preferredExistingArtifact
-              ? {
-                  action: "openArtifact",
-                  actionLabel: `Open ${artifactTypeLabel(preferredExistingArtifact.artifact_type).toLowerCase()}`,
-                  artifactId: preferredExistingArtifact.id,
-                  detail: "Saved work is ready to review.",
-                  meta: missionDocument?.filename ?? "Prepared material",
-                  stage: "Next",
-                  title: "Open saved work",
-                  tone: "review",
-                }
-              : firstPromptMode?.prompt
-                ? {
-                    action: "prompt",
-                    actionLabel: firstPromptMode.title,
-                    detail: firstPromptMode.detail,
-                    meta: missionDocument?.filename ?? "Prepared material",
-                    prompt: firstPromptMode.prompt,
-                    stage: "Next",
-                    title:
-                      persona === "student"
-                        ? "Start studying"
-                        : persona === "teacher"
-                          ? "Guide the lesson"
-                          : "Check the overview",
-                    tone: "work",
-                  }
-                : {
-                    action: "prompt",
-                    actionLabel: "Ask",
-                    detail: "Start with a focused question about the selected material.",
-                    meta: missionDocument?.filename ?? "Prepared material",
-                    prompt: "What are the most important points in this material?",
-                    stage: "Next",
-                    title: "Ask a question",
-                    tone: "work",
-                  };
-  const lastAssistantMessage =
-    [...activeMessages].reverse().find((message) => message.role === "assistant") ?? null;
-  const lastAnswerSources = lastAssistantMessage
-    ? uniqueCitationSourceNames(lastAssistantMessage.citations)
-    : [];
-  const sessionPulseTitle =
-    documents.length === 0
-      ? "Add material to begin"
-      : readyDocuments.length === 0
-        ? "Preparing your material"
-        : activeMessages.length === 0
-          ? "Ask from selected files"
-          : lastAnswerSources.length > 0
-            ? `Last answer used ${pluralize(lastAnswerSources.length, "file")}`
-            : "Last answer is ready";
-  const sessionPulseDetail =
-    lastAnswerSources.length > 0
-      ? lastAnswerSources.slice(0, 2).join(", ")
-      : activeContextDocuments.length > 0
-        ? activeContextDocuments
-            .slice(0, 2)
-            .map((document) => document.filename)
-            .join(", ")
-        : workspaceMission.meta;
-
-  function runWorkspaceMission() {
-    if (workspaceMission.action === "prepare") {
-      void onIngest(workspaceMission.documentId);
-      return;
-    }
-    if (workspaceMission.action === "prompt") {
-      setQuestion(workspaceMission.prompt);
-      return;
-    }
-    if (workspaceMission.action === "artifact") {
-      void onArtifact(workspaceMission.artifactKind, workspaceMission.documentId);
-      return;
-    }
-    if (workspaceMission.action === "openArtifact") {
-      setReaderArtifactId(workspaceMission.artifactId);
-      setActiveTab("study");
-    }
-  }
 
   function runStudyMode(mode: StudyMode) {
-    const firstReadyDocument = activeContextDocuments[0];
-
-    if (mode.artifactKind) {
-      if (firstReadyDocument) {
-        void onArtifact(mode.artifactKind, firstReadyDocument.id);
-      }
-      return;
-    }
-
-    if (mode.prompt) {
-      setQuestion(mode.prompt);
-    }
+    setQuestion(mode.prompt);
   }
 
   function askAboutStudySet(prompt: string, documentId: number) {
@@ -1304,7 +1092,13 @@ export default function App() {
     }
     setQuestion(prompt);
     setActiveTab("rag");
+    setMobileView("chat");
     resetViewportScroll();
+  }
+
+  function openActiveFlashcards() {
+    if (!activeDocument) return;
+    void onArtifact("flashcards", activeDocument.id);
   }
 
   function goToNextPracticeCard() {
@@ -1354,101 +1148,89 @@ export default function App() {
     setPaperTitle("Balanced Practice Paper");
   }
 
+  const documentTitle = activeDocument
+    ? documentDisplayTitle(activeDocument.filename)
+    : documents.length > 0
+      ? "Preparing your material"
+      : "Your study workspace";
+  const documentSubtitle =
+    "Review source material, ask document-grounded questions, and turn strong answers into briefs, flashcards, or exit tickets.";
+
   return (
     <div
-      className={`appShell theme-${appTheme} text-${textScale}${highContrast ? " contrast-high" : ""}`}
+      className={`appShell sgShell theme-${appTheme} text-${textScale}${highContrast ? " contrast-high" : ""}`}
     >
-      <aside className="sidebar">
-        <div className="brand">
-          <img src="/studygraph-mark.svg" alt="" aria-hidden="true" />
-          <div>
-            <h1>StudyGraph</h1>
-          </div>
+      <header className="sgTopbar">
+        <div className="sgBrand">
+          <span className="sgMark" aria-hidden="true">
+            <img src="/studygraph-mark.svg" alt="" />
+          </span>
+          <span className="sgBrandName">StudyGraph</span>
         </div>
-        <nav className="appNav" aria-label="Primary workspace">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                className={activeTab === tab.id ? "active" : ""}
-                aria-label={tab.label}
-                title={tab.label}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  if (tab.id !== "study") {
-                    setReaderArtifactId(null);
-                  }
-                  resetViewportScroll();
-                }}
-              >
-                <Icon size={18} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+
+        <nav className="sgMainNav" aria-label="Primary workspace">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`sgNavPill${activeTab === tab.id ? " active" : ""}`}
+              aria-current={activeTab === tab.id ? "page" : undefined}
+              onClick={() => {
+                setActiveTab(tab.id);
+                if (tab.id !== "study") {
+                  setReaderArtifactId(null);
+                }
+                resetViewportScroll();
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </nav>
-      </aside>
 
-      <main className="workspace">
-        <header
-          className={`workspaceHero ${activeTab === "rag" ? "chatHeader" : ""}`}
-        >
-          <div className="workspaceIntro">
-            <h2>{activeTabLabel}</h2>
-          </div>
-          <div className="topbarActions">
-            <div className="personaSwitch" aria-label="Workspace persona">
-              {personas.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-label={`${item.label} view`}
-                  aria-pressed={persona === item.id}
-                  className={persona === item.id ? "active" : ""}
-                  onClick={() => setPersona(item.id)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <button
-              className="iconButton"
-              onClick={() => setHighContrast((current) => !current)}
-              aria-label={contrastToggleLabel}
-              title={contrastToggleLabel}
-            >
-              <Accessibility size={18} />
-            </button>
-            <button
-              className="iconButton"
-              onClick={cycleTextScale}
-              aria-label="Text size"
-              title={`Text size: ${textScale}`}
-            >
-              <Type size={18} />
-            </button>
-            <button
-              className="iconButton"
-              onClick={toggleAppTheme}
-              aria-label={themeToggleLabel}
-              title={themeToggleLabel}
-            >
-              {appTheme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-            </button>
-            <button
-              className="iconButton"
-              onClick={() => void refresh()}
-              aria-label="Refresh data"
-              title="Refresh data"
-            >
-              <RefreshCcw size={18} />
-            </button>
-          </div>
-        </header>
+        <div className="sgTopActions">
+          <button
+            className="iconButton"
+            onClick={() => setHighContrast((current) => !current)}
+            aria-label={contrastToggleLabel}
+            title={contrastToggleLabel}
+          >
+            <Accessibility size={18} />
+          </button>
+          <button
+            className="iconButton"
+            onClick={cycleTextScale}
+            aria-label="Text size"
+            title={`Text size: ${textScale}`}
+          >
+            <Type size={18} />
+          </button>
+          <button
+            className="iconButton"
+            onClick={toggleAppTheme}
+            aria-label={themeToggleLabel}
+            aria-pressed={appTheme === "dark"}
+            title={themeToggleLabel}
+          >
+            {appTheme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
+          <button
+            className="iconButton sgAskChatAction"
+            onClick={() => {
+              setActiveTab("rag");
+              setMobileView("chat");
+            }}
+            aria-label="Ask chat"
+            title="Ask StudyGraph"
+          >
+            <MessageSquare size={18} />
+          </button>
+        </div>
+      </header>
 
+      <div className="sgBody">
         {connectionMissing ? (
-          <div className="connectionBanner" role="status">
+          <div className="connectionBanner sgBanner" role="status">
             <div>
               <strong>Offline workspace</strong>
               <span>Open StudyGraph on this device to sync material, chats, and study sets.</span>
@@ -1458,11 +1240,11 @@ export default function App() {
             </button>
           </div>
         ) : error ? (
-          <div className="alert">{error}</div>
+          <div className="alert sgBanner">{error}</div>
         ) : null}
 
         {providerMissing ? (
-          <div className="setupWarning">
+          <div className="setupWarning sgBanner">
             <AlertTriangle size={18} />
             <div>
               <strong>Learning support is not connected</strong>
@@ -1471,46 +1253,110 @@ export default function App() {
           </div>
         ) : null}
 
-        <div className="workspaceGrid">
-          <div className="workspacePrimary">
-
         {activeTab === "rag" ? (
-            <section className="learningCanvas" aria-label="Learning canvas">
-            <section className="canvasRail" aria-label="Material">
-              <label
-                className={`materialUpload${uploadDragActive ? " dragActive" : ""}`}
-                role="button"
-                tabIndex={0}
-                onDragEnter={onUploadDragEnter}
-                onDragOver={onUploadDragOver}
-                onDragLeave={onUploadDragLeave}
-                onDrop={(event) => void onUploadDrop(event)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    event.currentTarget.querySelector("input")?.click();
-                  }
-                }}
-              >
-                {busy === "upload" ? <Loader2 className="spin" size={20} /> : <Upload size={20} />}
-                <span>{busy === "upload" ? "Uploading..." : "Upload"}</span>
-                <input
-                  type="file"
-                  aria-hidden="true"
-                  accept=".pdf,.docx,.txt,.md,.markdown"
-                  tabIndex={-1}
-                  onChange={(event) => void onUpload(event)}
-                />
-              </label>
+          <section
+            className={`sgWorkspace${isLibraryCollapsed ? " library-collapsed" : ""} mobile-show-${mobileView}`}
+          >
+            <aside className="sgPanel sgLibrary" aria-label="Library and conversations">
+              <div className="sgLibraryTop">
+                <button
+                  type="button"
+                  className="sgCollapseRail"
+                  onClick={toggleLibrary}
+                  aria-expanded={!isLibraryCollapsed}
+                  aria-label={isLibraryCollapsed ? "Expand library" : "Collapse library"}
+                  title={isLibraryCollapsed ? "Expand library" : "Collapse library"}
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <label
+                  className={`sgUpload${uploadDragActive ? " dragActive" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  onDragEnter={onUploadDragEnter}
+                  onDragOver={onUploadDragOver}
+                  onDragLeave={onUploadDragLeave}
+                  onDrop={(event) => void onUploadDrop(event)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.currentTarget.querySelector("input")?.click();
+                    }
+                  }}
+                >
+                  {busy === "upload" ? <Loader2 className="spin" size={18} /> : <Upload size={18} />}
+                  <span>{busy === "upload" ? "Uploading..." : "Upload material"}</span>
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    aria-hidden="true"
+                    accept=".pdf,.docx,.txt,.md,.markdown"
+                    tabIndex={-1}
+                    onChange={(event) => void onUpload(event)}
+                  />
+                </label>
+              </div>
 
-              <div className="railSection">
-                <div className="railHeader">
-                  <h3>Material</h3>
-                  <span>{documents.length}</span>
+              <div className="sgRailActions" aria-label="Collapsed library actions">
+                <button
+                  type="button"
+                  className="sgRailTab"
+                  aria-label="Upload material"
+                  onClick={() => {
+                    expandLibraryTo("documents");
+                    window.setTimeout(() => uploadInputRef.current?.focus(), 0);
+                  }}
+                >
+                  <Upload size={18} />
+                </button>
+                <button
+                  type="button"
+                  className="sgRailTab"
+                  aria-label="Documents"
+                  onClick={() => expandLibraryTo("documents")}
+                >
+                  <FileStack size={18} />
+                </button>
+                <button
+                  type="button"
+                  className="sgRailTab"
+                  aria-label="Conversations"
+                  onClick={() => expandLibraryTo("conversations")}
+                >
+                  <MessageSquare size={18} />
+                </button>
+                <button
+                  type="button"
+                  className="sgRailTab"
+                  aria-label="New conversation"
+                  onClick={() => {
+                    expandLibraryTo("conversations");
+                    window.setTimeout(() => newThreadRef.current?.focus(), 0);
+                  }}
+                >
+                  <Plus size={18} />
+                </button>
+              </div>
+
+              <div
+                className={`sgLibrarySection${collapsedSections.documents ? " collapsed" : ""}`}
+                aria-label="Documents section"
+              >
+                <div className="sgSectionHead">
+                  <button
+                    type="button"
+                    className="sgSectionTitle"
+                    aria-expanded={!collapsedSections.documents}
+                    onClick={() => toggleSection("documents")}
+                  >
+                    <ChevronDown size={15} className="sgSectionChevron" />
+                    <span>Documents</span>
+                  </button>
+                  <span className="sgCount">{documents.length}</span>
                 </div>
-                <div className="materialStack">
+                <div className="sgDocList">
                   {documents.map((document) => {
-                    const isIngested = document.status === "ready";
+                    const isReady = document.status === "ready";
                     const latestJob = latestJobByDocumentId.get(document.id);
                     const isIngesting =
                       latestJob?.status === "running" || document.status === "ingesting";
@@ -1518,19 +1364,35 @@ export default function App() {
                       ? latestJob.status === "queued"
                       : document.status === "queued";
                     const hasActiveJob = isQueued || isIngesting;
+                    const isActive = isReady && selectedIds.includes(document.id);
 
                     return (
-                      <article key={document.id} className="materialRow">
-                        <FileText size={18} />
-                        <div>
-                          <strong title={document.filename}>{document.filename}</strong>
-                          <span>{statusLabel(document.status)}</span>
-                        </div>
-                        {!isIngested ? (
+                      <article
+                        key={document.id}
+                        className={`sgDocItem${isActive ? " active" : ""}`}
+                      >
+                        <button
+                          type="button"
+                          className="sgItemOpen"
+                          onClick={() => selectDocument(document)}
+                          disabled={!isReady}
+                          aria-label={`Open ${document.filename}`}
+                          title={document.filename}
+                        >
+                          <span className="sgItemTitle">
+                            <span className="sgItemName">{document.filename}</span>
+                            {isReady ? <i className="sgStatusDot" aria-hidden="true" /> : null}
+                          </span>
+                          <span className="sgItemMeta">{statusLabel(document.status)}</span>
+                        </button>
+                        {!isReady ? (
                           <button
-                            className="preparePill"
+                            type="button"
+                            className="sgPreparePill"
                             onClick={() => void onIngest(document.id)}
-                            disabled={!providerReady || hasActiveJob || busy === `ingest-${document.id}`}
+                            disabled={
+                              !providerReady || hasActiveJob || busy === `ingest-${document.id}`
+                            }
                             title={
                               hasActiveJob
                                 ? "Preparation already started"
@@ -1547,1360 +1409,1321 @@ export default function App() {
                                   ? "Preparing"
                                   : "Prepare"}
                           </button>
-                        ) : (
-                          <span className="readyDot" aria-label="Ready" />
-                        )}
+                        ) : null}
+                        <button
+                          type="button"
+                          className="sgDeleteItem"
+                          aria-label={`Delete ${document.filename}`}
+                          title="Delete"
+                          onClick={() => requestDeleteDocument(document)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </article>
                     );
                   })}
                   {documents.length === 0 ? (
-                    <div className="railEmpty">
-                      <Sparkles size={22} />
-                      <p>Add notes, PDFs, or worksheets.</p>
+                    <div className="sgEmptyState">
+                      No documents yet. Upload material to start a study session.
                     </div>
                   ) : null}
                 </div>
               </div>
 
-              <div className="railSection conversationList" aria-label="Saved conversations">
-                <div className="conversationListHeader">
-                  <h3>Conversations</h3>
-                  <button onClick={onNewChat} title="Start a new chat">
-                    <Plus size={16} />
-                    New
+              <div
+                className={`sgLibrarySection${collapsedSections.conversations ? " collapsed" : ""}`}
+                aria-label="Conversations section"
+              >
+                <div className="sgSectionHead">
+                  <button
+                    type="button"
+                    className="sgSectionTitle"
+                    aria-expanded={!collapsedSections.conversations}
+                    onClick={() => toggleSection("conversations")}
+                  >
+                    <ChevronDown size={15} className="sgSectionChevron" />
+                    <span>Conversations</span>
                   </button>
-                </div>
-                <div className="conversationItems">
-                  {qaSessions.map((session) => (
+                  <div className="sgSectionActions">
+                    <span className="sgCount">{qaSessions.length}</span>
                     <button
-                      key={session.id}
-                      className={activeSessionId === session.id ? "active" : ""}
-                      aria-label={`Open conversation: ${session.title}`}
-                      onClick={() => setActiveSessionId(session.id)}
-                    >
-                      <strong>{session.title}</strong>
-                      <span>{session.message_count} messages</span>
-                      {session.last_message ? <p>{compactPreviewText(session.last_message)}</p> : null}
-                    </button>
-                  ))}
-                  {qaSessions.length === 0 ? <p>No conversations yet.</p> : null}
-                </div>
-              </div>
-            </section>
-
-            <section className="canvasCenter">
-              <div className="studioCommand" aria-label="Workspace command center">
-                <section className={`missionPanel ${workspaceMission.tone}`} aria-label="Next workspace step">
-                  <div className="missionTopline">
-                    <span>{workspaceMission.stage}</span>
-                    {isSampleWorkspace ? <strong>Sample workspace</strong> : null}
-                  </div>
-                  <div className="missionCopy">
-                    <strong>{workspaceMission.title}</strong>
-                    <p>{workspaceMission.detail}</p>
-                  </div>
-                  <div className="missionTrail" aria-label="Workspace flow">
-                    {workspaceFlow.map((step) => (
-                      <span key={step.label} className={step.state}>
-                        {step.label}
-                      </span>
-                    ))}
-                  </div>
-                  {workspaceMission.action === "upload" ? (
-                    <label
-                      className={`missionAction${uploadDragActive ? " dragActive" : ""}`}
-                      role="button"
-                      tabIndex={0}
-                      onDragEnter={onUploadDragEnter}
-                      onDragOver={onUploadDragOver}
-                      onDragLeave={onUploadDragLeave}
-                      onDrop={(event) => void onUploadDrop(event)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          event.currentTarget.querySelector("input")?.click();
-                        }
-                      }}
-                    >
-                      {busy === "upload" ? (
-                        <Loader2 className="spin" size={16} />
-                      ) : (
-                        <Upload size={16} />
-                      )}
-                      <span>{busy === "upload" ? "Uploading..." : workspaceMission.actionLabel}</span>
-                      <input
-                        type="file"
-                        aria-hidden="true"
-                        accept=".pdf,.docx,.txt,.md,.markdown"
-                        tabIndex={-1}
-                        onChange={(event) => void onUpload(event)}
-                      />
-                    </label>
-                  ) : (
-                    <button
+                      ref={newThreadRef}
                       type="button"
-                      className="missionAction"
-                      disabled={"disabled" in workspaceMission ? workspaceMission.disabled : false}
-                      title={
-                        workspaceMission.action === "openArtifact"
-                          ? `${workspaceMission.actionLabel} in Study Sets`
-                          : workspaceMission.actionLabel
-                      }
-                      onClick={runWorkspaceMission}
+                      className="sgNewThread"
+                      onClick={onNewChat}
+                      title="Start a new chat"
                     >
-                      <span>{workspaceMission.actionLabel}</span>
-                      <ArrowRight size={16} />
+                      <Plus size={14} />
+                      New
                     </button>
-                  )}
-                </section>
-
-                <section className="sourceScope" aria-label="Selected material">
-                  <div className="sourceScopeHeader">
-                    <div>
-                      <span className="canvasKicker">Files</span>
-                      <h3>
-                        {readyDocuments.length > 0
-                          ? `${activeContextDocuments.length || readyDocuments.length} in use`
-                          : "No prepared files"}
-                      </h3>
-                    </div>
-                    <label
-                      className={`miniUploadAction${uploadDragActive ? " dragActive" : ""}`}
-                      role="button"
-                      tabIndex={0}
-                      onDragEnter={onUploadDragEnter}
-                      onDragOver={onUploadDragOver}
-                      onDragLeave={onUploadDragLeave}
-                      onDrop={(event) => void onUploadDrop(event)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          event.currentTarget.querySelector("input")?.click();
-                        }
-                      }}
+                  </div>
+                </div>
+                <div className="sgThreadList">
+                  {qaSessions.map((session) => (
+                    <article
+                      key={session.id}
+                      className={`sgThread${activeSessionId === session.id ? " active" : ""}`}
                     >
-                      {busy === "upload" ? (
-                        <Loader2 className="spin" size={14} />
-                      ) : (
-                        <Upload size={14} />
-                      )}
-                      <span>{busy === "upload" ? "Adding..." : "Add file"}</span>
-                      <input
-                        type="file"
-                        aria-hidden="true"
-                        accept=".pdf,.docx,.txt,.md,.markdown"
-                        tabIndex={-1}
-                        onChange={(event) => void onUpload(event)}
-                      />
-                    </label>
-                  </div>
-                  <div className="documentSelector">
-                    {readyDocuments.map((document) => (
-                      <label key={document.id}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(document.id)}
-                          onChange={(event) => {
-                            setSelectedIds((current) =>
-                              event.target.checked
-                                ? [...current, document.id]
-                                : current.filter((id) => id !== document.id),
-                            );
-                          }}
-                        />
-                        <span>{document.filename}</span>
-                      </label>
-                    ))}
-                    {readyDocuments.length === 0 ? <p>Prepare material first.</p> : null}
-                  </div>
-                </section>
-
-              </div>
-
-              <section className="sessionPulse" aria-label="Learning session pulse">
-                <div className="sessionPulseSignal" aria-hidden="true">
-                  {workspaceFlow.map((step) => (
-                    <span key={step.label} className={step.state} />
+                      <button
+                        type="button"
+                        className="sgItemOpen"
+                        aria-label={`Open conversation: ${session.title}`}
+                        onClick={() => openConversation(session.id)}
+                      >
+                        <span className="sgItemTitle">
+                          <span className="sgItemName">{session.title}</span>
+                        </span>
+                        <span className="sgItemMeta">
+                          {pluralize(session.message_count, "message")}
+                          {session.last_message
+                            ? ` · ${compactPreviewText(session.last_message, 48)}`
+                            : ""}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className="sgDeleteItem"
+                        aria-label={`Delete ${session.title} conversation`}
+                        title="Delete"
+                        onClick={() => requestDeleteConversation(session)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </article>
                   ))}
+                  {qaSessions.length === 0 ? (
+                    <div className="sgEmptyState">
+                      No conversations yet. Start a new thread from the button above.
+                    </div>
+                  ) : null}
                 </div>
-                <div className="sessionPulseCopy">
-                  <span>Learning session</span>
-                  <strong>{sessionPulseTitle}</strong>
-                  <p>{sessionPulseDetail}</p>
+              </div>
+            </aside>
+
+            <section className="sgPanel sgStudy" aria-label="Document workspace">
+              <header className="sgStudyHeader">
+                <div>
+                  <h1>{documentTitle}</h1>
+                  <p className="sgHeaderSubtitle">{documentSubtitle}</p>
                 </div>
-                <div className="sessionPulseStats" aria-label="Session context">
-                  <span>
-                    <BookOpen size={14} />
-                    {pluralize(activeContextDocuments.length, "file")}
-                  </span>
-                  <span>
-                    <Network size={14} />
-                    {lastAssistantMessage
-                      ? pluralize(lastAssistantMessage.citations.length, "reference")
+              </header>
+
+              <div className="sgSourceStrip">
+                <div className="sgSourceChips" aria-label="Active sources">
+                  {activeDocument ? (
+                    <span className="sgChip active">
+                      <CheckCircle2 size={13} />
+                      {activeDocument.filename}
+                    </span>
+                  ) : (
+                    <span className="sgChip">No prepared files</span>
+                  )}
+                  <span className="sgChip">
+                    {lastAnswerSources.length > 0
+                      ? pluralize(lastAssistantMessage?.citations.length ?? 0, "reference")
                       : "No references yet"}
                   </span>
-                  <span>
-                    <Layers size={14} />
-                    {pluralize(artifacts.length, "study set")}
-                  </span>
+                  <span className="sgChip">{pluralize(artifacts.length, "study set")}</span>
                 </div>
-              </section>
-
-              <div className="messageTimeline learningStream" aria-label="Conversation history">
-                {activeMessages.map((message) => {
-                  const citationSourceNames = uniqueCitationSourceNames(message.citations);
-                  const visibleSourceNames = citationSourceNames.slice(0, 3);
-                  const hiddenSourceCount = citationSourceNames.length - visibleSourceNames.length;
-                  const answerActionDocument = activeContextDocuments[0] ?? readyDocuments[0] ?? null;
-                  const answerSummaryArtifact = answerActionDocument
-                    ? artifactByDocumentAndType.get(artifactKey(answerActionDocument.id, "summary"))
-                    : undefined;
-                  const answerFlashcardsArtifact = answerActionDocument
-                    ? artifactByDocumentAndType.get(
-                        artifactKey(answerActionDocument.id, "flashcards"),
-                      )
-                    : undefined;
-                  const answerSummaryDisabled =
-                    !answerActionDocument ||
-                    (!answerSummaryArtifact &&
+                <button
+                  type="button"
+                  className="sgPrimaryAction"
+                  onClick={openActiveFlashcards}
+                  disabled={
+                    !activeDocument ||
+                    (!activeFlashcardsArtifact &&
                       (!providerReady ||
-                        answerActionDocument.id < 0 ||
-                        busy === `summary-${answerActionDocument.id}`));
-                  const answerFlashcardsDisabled =
-                    !answerActionDocument ||
-                    (!answerFlashcardsArtifact &&
-                      (!providerReady ||
-                        answerActionDocument.id < 0 ||
-                        busy === `flashcards-${answerActionDocument.id}`));
-
-                  return (
-                    <article key={message.id} className={`chatMessage ${message.role}`}>
-                      <span className="messageRole">
-                        {message.role === "user" ? "You" : "StudyGraph"}
-                      </span>
-                      {message.role === "assistant" ? (
-                        <RichText content={message.content} />
-                      ) : (
-                        <p>{message.content}</p>
-                      )}
-                      {message.role === "assistant" && message.citations.length > 0 ? (
-                        <div className="answerEvidence" aria-label="Answer sources">
-                          <span>From your files</span>
-                          <div>
-                            {visibleSourceNames.map((sourceName) => (
-                              <strong key={sourceName}>{sourceName}</strong>
-                            ))}
-                            {hiddenSourceCount > 0 ? (
-                              <strong>+{hiddenSourceCount} more</strong>
-                            ) : null}
-                          </div>
-                        </div>
-                      ) : null}
-                      {message.role === "assistant" ? (
-                        <div className="answerNextSteps" aria-label="Study next">
-                          <span>Study next</span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setQuestion("Ask me one question to check if I understood this answer.")
-                            }
-                          >
-                            Check me
-                          </button>
-                          <button
-                            type="button"
-                            disabled={answerFlashcardsDisabled}
-                            title={
-                              answerFlashcardsArtifact
-                                ? "Open flashcards"
-                                : answerActionDocument?.id && answerActionDocument.id < 0
-                                  ? "Upload your own material to create flashcards"
-                                  : !providerReady
-                                    ? providerSetupMessage
-                                    : "Create flashcards"
-                            }
-                            onClick={() =>
-                              answerActionDocument
-                                ? void onArtifact("flashcards", answerActionDocument.id)
-                                : undefined
-                            }
-                          >
-                            {answerFlashcardsArtifact ? "Open practice" : "Make practice"}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={answerSummaryDisabled}
-                            title={
-                              answerSummaryArtifact
-                                ? "Open brief"
-                                : answerActionDocument?.id && answerActionDocument.id < 0
-                                  ? "Upload your own material to create a brief"
-                                  : !providerReady
-                                    ? providerSetupMessage
-                                    : "Create brief"
-                            }
-                            onClick={() =>
-                              answerActionDocument
-                                ? void onArtifact("summary", answerActionDocument.id)
-                                : undefined
-                            }
-                          >
-                            {answerSummaryArtifact ? "Open brief" : "Save brief"}
-                          </button>
-                        </div>
-                      ) : null}
-                      {message.citations.length > 0 ? (
-                        <details className="citationLens">
-                          <summary className="citationLensHeader">
-                            <Network size={16} />
-                            <div>
-                              <strong>References used</strong>
-                              <span>{pluralize(message.citations.length, "reference")}</span>
-                            </div>
-                          </summary>
-                          <div className="citationList compact">
-                            {message.citations.map((citation, index) => (
-                              <article key={index} className="citation">
-                                <div className="citationTopline">
-                                  <span>Reference {index + 1}</span>
-                                  <strong>
-                                    {String(citation.filename || `Reference ${index + 1}`)}
-                                  </strong>
-                                </div>
-                                {citation.text ? <p>{String(citation.text)}</p> : null}
-                              </article>
-                            ))}
-                          </div>
-                          {message.confidence_notes.length > 0 ? (
-                            <div className="confidenceNotes">
-                              {message.confidence_notes.map((note, index) => (
-                                <p key={index}>{note}</p>
-                              ))}
-                            </div>
-                          ) : null}
-                        </details>
-                      ) : null}
-                    </article>
-                  );
-                })}
-                {busy === "ask" ? (
-                  <article className="chatMessage assistant">
-                    <span className="messageRole">StudyGraph</span>
-                    <p>Thinking...</p>
-                  </article>
-                ) : null}
-                {activeMessages.length === 0 && busy !== "ask" ? (
-                  documents.length === 0 ? (
-                    <div className="conversationEmpty onboardingEmpty">
-                      <div className="emptyMark" aria-hidden="true">
-                        <Sparkles size={24} />
-                      </div>
-                      <div>
-                        <h3>Start a study session</h3>
-                        <p>Bring one file. StudyGraph keeps answers tied to it.</p>
-                      </div>
-                      <div className="emptyActions">
-                        <label
-                          className={`emptyUploadAction${uploadDragActive ? " dragActive" : ""}`}
-                          role="button"
-                          tabIndex={0}
-                          onDragEnter={onUploadDragEnter}
-                          onDragOver={onUploadDragOver}
-                          onDragLeave={onUploadDragLeave}
-                          onDrop={(event) => void onUploadDrop(event)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              event.currentTarget.querySelector("input")?.click();
-                            }
-                          }}
-                        >
-                          {busy === "upload" ? (
-                            <Loader2 className="spin" size={18} />
-                          ) : (
-                            <Upload size={18} />
-                          )}
-                          <span>{busy === "upload" ? "Uploading..." : "Add material"}</span>
-                          <input
-                            type="file"
-                            aria-hidden="true"
-                            accept=".pdf,.docx,.txt,.md,.markdown"
-                            tabIndex={-1}
-                            onChange={(event) => void onUpload(event)}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          className="sampleWorkspaceAction"
-                          onClick={openSampleWorkspace}
-                        >
-                          Explore sample
-                        </button>
-                      </div>
-                      <div className="learningLoopPreview" aria-label="Learning loop">
-                        <span>
-                          <strong>1</strong>
-                          Add
-                        </span>
-                        <span>
-                          <strong>2</strong>
-                          Ask
-                        </span>
-                        <span>
-                          <strong>3</strong>
-                          Create
-                        </span>
-                      </div>
-                    </div>
+                        activeDocument.id < 0 ||
+                        busy === `flashcards-${activeDocument.id}`))
+                  }
+                  title={
+                    activeFlashcardsArtifact
+                      ? "Open flashcards"
+                      : !activeDocument
+                        ? "Prepare material first"
+                        : activeDocument.id < 0
+                          ? "Upload your own material to create flashcards"
+                          : !providerReady
+                            ? providerSetupMessage
+                            : "Create flashcards"
+                  }
+                >
+                  {busy === `flashcards-${activeDocument?.id}` ? (
+                    <Loader2 className="spin" size={15} />
                   ) : (
-                    <div className="conversationEmpty sourceReadyState">
-                      <SourceConstellation
-                        documents={activeContextDocuments}
-                        moves={composerPromptModes.map((mode) => ({
-                          id: mode.id,
-                          title: mode.title,
-                          detail: mode.detail,
-                          icon: mode.icon,
-                          onRun: () => runStudyMode(mode),
-                        }))}
-                        modesLabel={personaModeLabel}
-                      />
-                    </div>
-                  )
-                ) : null}
+                    <Layers size={15} />
+                  )}
+                  Open flashcards
+                </button>
               </div>
 
-              <form className="askForm chatComposer" onSubmit={(event) => void onAsk(event)}>
-                {activeMessages.length > 0 &&
-                readyDocuments.length > 0 &&
-                composerPromptModes.length > 0 ? (
-                  <div
-                    className="composerGuides"
-                    aria-label={`${personaModeLabel} composer suggestions`}
-                  >
-                    <span>Try</span>
-                    <div>
-                      {composerPromptModes.map((mode) => {
-                        const Icon = mode.icon;
-                        return (
-                          <button
-                            key={mode.id}
-                            type="button"
-                            className="composerGuideButton"
-                            title={mode.detail}
-                            onClick={() => runStudyMode(mode)}
-                          >
-                            <Icon size={15} />
-                            {mode.title}
-                          </button>
-                        );
-                      })}
+              <article className="sgDocument">
+                {documents.length === 0 ? (
+                  <div className="sgPaper sgOnboarding">
+                    <div className="sgOnboardingMark" aria-hidden="true">
+                      <Sparkles size={26} />
+                    </div>
+                    <h2>Start a study session</h2>
+                    <p>
+                      Bring one file. StudyGraph keeps every answer tied to it, and turns strong
+                      answers into briefs and flashcards.
+                    </p>
+                    <div className="sgOnboardingActions">
+                      <label
+                        className={`sgPrimaryAction sgOnboardingUpload${uploadDragActive ? " dragActive" : ""}`}
+                        role="button"
+                        tabIndex={0}
+                        onDragEnter={onUploadDragEnter}
+                        onDragOver={onUploadDragOver}
+                        onDragLeave={onUploadDragLeave}
+                        onDrop={(event) => void onUploadDrop(event)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            event.currentTarget.querySelector("input")?.click();
+                          }
+                        }}
+                      >
+                        {busy === "upload" ? (
+                          <Loader2 className="spin" size={16} />
+                        ) : (
+                          <Upload size={16} />
+                        )}
+                        <span>{busy === "upload" ? "Uploading..." : "Add material"}</span>
+                        <input
+                          type="file"
+                          aria-hidden="true"
+                          accept=".pdf,.docx,.txt,.md,.markdown"
+                          tabIndex={-1}
+                          onChange={(event) => void onUpload(event)}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="sgGhostAction"
+                        onClick={openSampleWorkspace}
+                      >
+                        Explore sample
+                      </button>
                     </div>
                   </div>
-                ) : null}
-                <textarea
-                  value={question}
-                  onChange={(event) => setQuestion(event.target.value)}
-                  placeholder="Ask a question, compare notes, or request examples..."
-                />
-                <button
-                  disabled={!providerReady || busy === "ask" || !question.trim()}
-                  title={!providerReady ? providerSetupMessage : "Ask question"}
-                >
-                  {busy === "ask" ? <Loader2 className="spin" size={16} /> : <Send size={16} />}
-                  Send
-                </button>
-              </form>
-            </section>
-          </section>
-        ) : null}
-
-        {activeTab === "study" ? (
-          readerArtifact ? (
-            <section className={`readerMode ${appTheme}`} aria-label="Reader mode">
-              <div className="readerTopbar">
-                <button
-                  className="readerButton"
-                  onClick={() => setReaderArtifactId(null)}
-                  aria-label="Close reader"
-                  title="Close reader"
-                >
-                  <X size={18} />
-                  Close
-                </button>
-                <button
-                  className="readerButton"
-                  onClick={toggleAppTheme}
-                  aria-label={themeToggleLabel}
-                  title={themeToggleLabel}
-                >
-                  {appTheme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-                  {appTheme === "light" ? "Dark" : "Light"}
-                </button>
-              </div>
-
-              <article className="readerArticle">
-                <div className="readerMeta">
-                  <span>{artifactTypeLabel(readerArtifact.artifact_type)}</span>
-                  <span>{new Date(readerArtifact.updated_at).toLocaleDateString()}</span>
-                </div>
-                <h3>{readerArtifact.title}</h3>
-                {readerArtifact.artifact_type === "summary" ? (
-                  <RichText
-                    className="readerBody"
-                    content={String(readerArtifact.content.summary || "")}
-                  />
+                ) : activeDocument ? (
+                  activeSummaryArtifact ? (
+                    <div className="sgPaper">
+                      <h2>{artifactDisplayTitle(activeSummaryArtifact)}</h2>
+                      <RichText
+                        className="sgPaperBody"
+                        content={String(activeSummaryArtifact.content.summary || "")}
+                      />
+                    </div>
+                  ) : (
+                    <div className="sgPaper sgPaperGuide">
+                      <h2>{documentTitle}</h2>
+                      <p>
+                        This material is prepared and ready. Ask a grounded question in the chat,
+                        or build a brief you can reuse with students.
+                      </p>
+                      <button
+                        type="button"
+                        className="sgGhostAction"
+                        onClick={() =>
+                          activeDocument && void onArtifact("summary", activeDocument.id, false)
+                        }
+                        disabled={
+                          activeDocument.id < 0 ||
+                          !providerReady ||
+                          busy === `summary-${activeDocument.id}`
+                        }
+                        title={
+                          activeDocument.id < 0
+                            ? "Upload your own material to create a brief"
+                            : !providerReady
+                              ? providerSetupMessage
+                              : "Create a brief from this material"
+                        }
+                      >
+                        {busy === `summary-${activeDocument.id}` ? (
+                          <Loader2 className="spin" size={15} />
+                        ) : (
+                          <FileText size={15} />
+                        )}
+                        Create a brief
+                      </button>
+                    </div>
+                  )
                 ) : (
-                  <div className="readerFlashcards">
-                    {Array.isArray(readerArtifact.content.flashcards)
-                      ? readerArtifact.content.flashcards.map((card, index) => (
-                          <div key={index} className="readerFlashcard">
-                            <span>Card {index + 1}</span>
-                            <strong>{String((card as { front?: string }).front || "")}</strong>
-                            <p>{String((card as { back?: string }).back || "")}</p>
-                          </div>
-                        ))
-                      : null}
+                  <div className="sgPaper sgPaperGuide">
+                    <h2>Preparing your material</h2>
+                    <p>
+                      {firstUnreadyDocument
+                        ? "Your file is uploaded. Prepare it from the library, then ask anything."
+                        : "Upload a file to begin."}
+                    </p>
                   </div>
                 )}
               </article>
             </section>
-          ) : (
-            <section className="studyShelf">
-              {focusedStudyArtifact ? (
-                <div className="studyReviewGrid">
-                  <article className="reviewFocus" aria-label="Focused study set">
-                    <div className="reviewFocusTop">
-                      <div className="shelfType large" aria-hidden="true">
-                        {focusedStudyArtifact.artifact_type === "summary" ? (
-                          <FileText size={22} />
+
+            <aside className="sgPanel sgChat" aria-label="Study chat">
+              <header className="sgChatHeader">
+                <div className="sgChatTitle">
+                  <strong>Ask StudyGraph</strong>
+                  <span>Grounded in the active document</span>
+                </div>
+                <button
+                  type="button"
+                  className="sgMiniAction"
+                  onClick={onNewChat}
+                  aria-label="New conversation"
+                  title="New conversation"
+                >
+                  <Plus size={16} />
+                </button>
+              </header>
+
+              <div className="sgMessages" aria-label="Conversation history">
+                {activeMessages.length === 0 && busy !== "ask" ? (
+                  <div className="sgMessage assistant">
+                    <span className="sgAssistantLabel">StudyGraph</span>
+                    <div className="sgBubble">
+                      {readyDocuments.length > 0
+                        ? "Ask anything about the active document. Every answer stays tied to your sources."
+                        : "Upload and prepare a file, then ask grounded questions here."}
+                    </div>
+                  </div>
+                ) : null}
+
+                {activeMessages.map((message) => {
+                  const citationSourceNames = uniqueCitationSourceNames(message.citations);
+                  return (
+                    <div key={message.id} className={`sgMessage ${message.role}`}>
+                      {message.role === "assistant" ? (
+                        <span className="sgAssistantLabel">StudyGraph</span>
+                      ) : null}
+                      <div className="sgBubble">
+                        {message.role === "assistant" ? (
+                          <RichText content={message.content} />
                         ) : (
-                          <Layers size={22} />
+                          <p>{message.content}</p>
                         )}
                       </div>
-                      <div>
-                        <span className="canvasKicker">
-                          {artifactTypeLabel(focusedStudyArtifact.artifact_type)}
-                        </span>
-                        <h4>{artifactDisplayTitle(focusedStudyArtifact)}</h4>
-                        <p>{focusedStudySource}</p>
-                      </div>
-                    </div>
-                    <div className="reviewFocusMeta" aria-label="Focused study set details">
-                      <span>{new Date(focusedStudyArtifact.updated_at).toLocaleDateString()}</span>
-                      <span>{artifactTypeLabel(focusedStudyArtifact.artifact_type)}</span>
-                      <span>{focusedStudySource}</span>
-                    </div>
-                    <div className="studyActionDeck" aria-label="Study set actions">
-                      <button
-                        className="readerOpenButton primary"
-                        onClick={() => setReaderArtifactId(focusedStudyArtifact.id)}
-                        aria-label={`Open focused reader for ${focusedStudyArtifact.title}`}
-                        title={`Open focused reader for ${focusedStudyArtifact.title}`}
-                      >
-                        <BookOpen size={16} />
-                        Open reader
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          askAboutStudySet(
-                            focusedStudyArtifact.artifact_type === "summary"
-                              ? "Quiz me on the most important points in this summary."
-                              : "Help me practice these flashcards with follow-up questions.",
-                            focusedStudyArtifact.document_id,
-                          )
-                        }
-                      >
-                        <HelpCircle size={16} />
-                        Quiz me
-                      </button>
-                      {focusedStudyArtifact.artifact_type === "summary" ? (
-                        <button
-                          type="button"
-                          disabled={
-                            focusedStudyArtifact.document_id < 0 ||
-                            (!artifactByDocumentAndType.get(
-                              artifactKey(focusedStudyArtifact.document_id, "flashcards"),
-                            ) &&
-                              (!providerReady ||
-                                busy === `flashcards-${focusedStudyArtifact.document_id}`))
-                          }
-                          title={
-                            focusedStudyArtifact.document_id < 0
-                              ? "Upload your own material to create flashcards"
-                              : !providerReady &&
-                                  !artifactByDocumentAndType.get(
-                                    artifactKey(focusedStudyArtifact.document_id, "flashcards"),
-                                  )
-                                ? providerSetupMessage
-                                : "Create or open flashcards"
-                          }
-                          onClick={() =>
-                            void onArtifact("flashcards", focusedStudyArtifact.document_id)
-                          }
-                        >
-                          {busy === `flashcards-${focusedStudyArtifact.document_id}` ? (
-                            <Loader2 className="spin" size={16} />
-                          ) : (
-                            <Layers size={16} />
-                          )}
-                          Cards
-                        </button>
+                      {message.role === "assistant" && citationSourceNames.length > 0 ? (
+                        <div className="sgCitationRow" aria-label="Answer sources">
+                          {citationSourceNames.map((sourceName) => (
+                            <span key={sourceName} className="sgCitation">
+                              {sourceName}
+                            </span>
+                          ))}
+                        </div>
                       ) : null}
                     </div>
-                    {focusedStudyArtifact.artifact_type === "flashcards" && activePracticeCard ? (
-                      <div className="practicePanel" aria-label="Flashcard practice">
-                        <div className="practiceSession" aria-label="Practice progress">
-                          <div className="practiceSessionCopy">
-                            <span>{practiceCue}</span>
-                            <strong>{practiceProgress}</strong>
-                          </div>
-                          <div
-                            className="practiceProgressTrack"
-                            aria-hidden="true"
-                            style={{ "--practice-progress": `${practicePercent}%` } as CSSProperties}
-                          />
-                          <div className="practiceSessionStats">
-                            <span>{practiceRemaining} left</span>
-                            <span>{practiceMasteredCount} remembered</span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          className={`practiceCard${practiceRevealed ? " revealed" : ""}`}
-                          onClick={() => setPracticeRevealed((current) => !current)}
-                          aria-label={practiceRevealed ? "Hide answer" : "Reveal answer"}
-                        >
-                          <span>{practiceRevealed ? "Answer" : "Prompt"}</span>
-                          <strong>
-                            {practiceRevealed
-                              ? activePracticeCard.back || "No answer saved."
-                              : activePracticeCard.front || "No prompt saved."}
-                          </strong>
-                          <small>{practiceRevealed ? "Tap to hide" : "Tap to reveal"}</small>
-                        </button>
-                        <div className="practiceControls">
-                          <button type="button" onClick={() => setPracticeRevealed(true)}>
-                            Reveal
-                          </button>
-                          <button type="button" onClick={goToNextPracticeCard}>
-                            Again
-                          </button>
-                          <button type="button" className="primary" onClick={markPracticeCardMastered}>
-                            Got it
-                          </button>
-                          <button
-                            type="button"
-                            className="iconOnly"
-                            onClick={resetPracticeSession}
-                            aria-label="Restart flashcard practice"
-                            title="Restart practice"
-                          >
-                            <RefreshCcw size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <RichText
-                        className="reviewFocusPreview"
-                        content={
-                          focusedStudyArtifact.artifact_type === "summary"
-                            ? String(focusedStudyArtifact.content.summary || "")
-                            : focusedStudyPreview || "Open the reader to review this study set."
-                        }
-                      />
-                    )}
-                  </article>
+                  );
+                })}
 
-                  <aside className="reviewQueue" aria-label="Saved study sets">
-                    <div className="reviewQueueHeader">
-                      <div>
-                        <span className="canvasKicker">Queue</span>
-                        <h3>Review queue</h3>
-                      </div>
-                      <strong>{pluralize(artifacts.length, "set")}</strong>
-                    </div>
-                    <div className="shelfList">
-                      {artifacts.map((artifact) => {
-                        const sourceName =
-                          documentNameById.get(artifact.document_id) ??
-                          `Material #${artifact.document_id}`;
-                        const previewText = compactPreviewText(artifactPreviewText(artifact), 96);
-                        const isFocused = focusedStudyArtifact?.id === artifact.id;
-
-                        return (
-                          <article
-                            key={artifact.id}
-                            className={`shelfItem compact ${isFocused ? "active" : ""}`}
-                          >
-                            <div className="shelfType" aria-hidden="true">
-                              {artifact.artifact_type === "summary" ? (
-                                <FileText size={18} />
-                              ) : (
-                                <Layers size={18} />
-                              )}
-                            </div>
-                            <div className="shelfItemMain">
-                              <div className="shelfItemMeta">
-                                <span>{artifactTypeLabel(artifact.artifact_type)}</span>
-                                <span>{new Date(artifact.updated_at).toLocaleDateString()}</span>
-                              </div>
-                              <h4>{artifactDisplayTitle(artifact)}</h4>
-                              <p>{previewText || "Open the reader to review this study set."}</p>
-                              <small>{sourceName}</small>
-                            </div>
-                            <div className="shelfItemActions">
-                              <button
-                                className="shelfPreviewButton"
-                                type="button"
-                                disabled={isFocused}
-                                onClick={() => setFocusedArtifactId(artifact.id)}
-                                aria-label={`Preview ${artifact.title}`}
-                                title={`Preview ${artifact.title}`}
-                              >
-                                {isFocused ? "In focus" : "Preview"}
-                              </button>
-                              <button
-                                className="readerOpenButton"
-                                onClick={() => setReaderArtifactId(artifact.id)}
-                                aria-label={`Open reader for ${artifact.title}`}
-                                title={`Open reader for ${artifact.title}`}
-                              >
-                                <BookOpen size={16} />
-                                Reader
-                              </button>
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  </aside>
-                </div>
-              ) : (
-                <div className="emptyState compact">
-                    <Layers size={22} />
-                    <h3>No study sets yet</h3>
-                    <p>Create a summary or flashcards from prepared material.</p>
-                </div>
-              )}
-            </section>
-          )
-        ) : null}
-
-        {activeTab === "printables" ? (
-          <section className="panel paperBuilder">
-            <div className="panelHeader paperStudioHeader">
-              <div>
-                <span className="canvasKicker">Paper studio</span>
-                <h3>Create from class material</h3>
-                <p>Pick the moment, shape the questions, and review before download.</p>
-              </div>
-            </div>
-
-            <section className="paperLaunchPad" aria-label="Paper starting points">
-              <div>
-                <span className="canvasKicker">Start with</span>
-                <h4>Pick the classroom moment</h4>
-              </div>
-              <div className="paperLaunchOptions">
-                <button
-                  type="button"
-                  aria-label="Use quick check preset, 7 questions"
-                  onClick={() =>
-                    applyPaperPreset("quick_check", "worksheet_pack", "easy", {
-                      mcq: 4,
-                      short: 3,
-                      long: 0,
-                    })
-                  }
-                >
-                  <CheckCircle2 size={17} />
-                  <strong>Quick check</strong>
-                  <span>7 questions</span>
-                </button>
-                <button
-                  type="button"
-                  aria-label="Use balanced preset, 12 questions"
-                  onClick={() =>
-                    applyPaperPreset("balanced", "teacher_pack", "medium", {
-                      mcq: 5,
-                      short: 5,
-                      long: 2,
-                    })
-                  }
-                >
-                  <ClipboardList size={17} />
-                  <strong>Balanced</strong>
-                  <span>12 questions</span>
-                </button>
-                <button
-                  type="button"
-                  aria-label="Use exam prep preset, 17 questions"
-                  onClick={() =>
-                    applyPaperPreset("exam", "exam_variants", "hard", {
-                      mcq: 8,
-                      short: 6,
-                      long: 3,
-                    })
-                  }
-                >
-                  <Clock3 size={17} />
-                  <strong>Exam prep</strong>
-                  <span>17 questions</span>
-                </button>
-              </div>
-            </section>
-
-            <div className="paperStudio">
-              <form
-                id="paper-create-form"
-                className="paperWizard"
-                onSubmit={(event) => void onCreatePrintable(event)}
-              >
-                <div className="paperStepRail" aria-label="Paper setup steps">
-                  <button type="button" onClick={() => scrollPaperStep("paper-step-source")}>
-                    Source
-                  </button>
-                  <button type="button" onClick={() => scrollPaperStep("paper-step-format")}>
-                    Format
-                  </button>
-                  <button type="button" onClick={() => scrollPaperStep("paper-step-classroom")}>
-                    Classroom
-                  </button>
-                  <button type="button" onClick={() => scrollPaperStep("paper-step-mix")}>
-                    Mix
-                  </button>
-                </div>
-                <section id="paper-step-source" className="paperWizardSection wideField">
-                  <div className="paperWizardStep">
-                    <span>1</span>
-                    <div>
-                      <strong>Source</strong>
-                      <small>Pick the material and scope.</small>
-                    </div>
+                {busy === "ask" ? (
+                  <div className="sgMessage assistant">
+                    <span className="sgAssistantLabel">StudyGraph</span>
+                    <div className="sgBubble">Thinking...</div>
                   </div>
-                  <label>
-                    Class material
-                    <select
-                      value={paperDocumentId}
-                      onChange={(event) =>
-                        setPaperDocumentId(event.target.value ? Number(event.target.value) : "")
-                      }
-                    >
-                      <option value="">Choose prepared material</option>
-                      {readyDocuments.map((document) => (
-                        <option key={document.id} value={document.id}>
-                          {document.filename}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Topic or range
-                    <input
-                      value={paperTopic}
-                      onChange={(event) => setPaperTopic(event.target.value)}
-                      placeholder="Optional topic, chapter, or page range"
-                    />
-                  </label>
-                </section>
-
-                <section id="paper-step-format" className="paperWizardSection">
-                  <div className="paperWizardStep">
-                    <span>2</span>
-                    <div>
-                      <strong>Format</strong>
-                      <small>Choose what students receive.</small>
-                    </div>
-                  </div>
-                  <label>
-                    Paper title
-                    <input
-                      aria-label="Paper title"
-                      value={paperTitle}
-                      onChange={(event) => setPaperTitle(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Paper type
-                    <select
-                      value={paperOutputType}
-                      onChange={(event) => setPaperOutputType(event.target.value)}
-                    >
-                      <option value="question_paper">Question paper only</option>
-                      <option value="teacher_pack">Question paper + answer key</option>
-                      <option value="worksheet_pack">Worksheet pack</option>
-                      <option value="exam_variants">Quiz/exam variants</option>
-                    </select>
-                  </label>
-                  <label>
-                    Material scope
-                    <select
-                      value={paperSourceMode}
-                      onChange={(event) => setPaperSourceMode(event.target.value)}
-                    >
-                      <option value="whole_book">Whole book</option>
-                      <option value="chapter_or_pages">Chapter or page range</option>
-                      <option value="topic">Topic</option>
-                    </select>
-                  </label>
-                </section>
-
-                <section id="paper-step-classroom" className="paperWizardSection">
-                  <div className="paperWizardStep">
-                    <span>3</span>
-                    <div>
-                      <strong>Classroom</strong>
-                      <small>Match the learners.</small>
-                    </div>
-                  </div>
-                  <label>
-                    Class
-                    <input
-                      value={paperClassName}
-                      onChange={(event) => setPaperClassName(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Subject
-                    <input
-                      value={paperSubject}
-                      onChange={(event) => setPaperSubject(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Difficulty
-                    <select
-                      value={paperDifficulty}
-                      onChange={(event) => setPaperDifficulty(event.target.value)}
-                    >
-                      <option value="easy">Easy</option>
-                      <option value="medium">Medium</option>
-                      <option value="hard">Hard</option>
-                    </select>
-                  </label>
-                </section>
-
-                <section id="paper-step-mix" className="paperWizardSection wideField paperMixSection">
-                  <div className="paperWizardStep">
-                    <span>4</span>
-                    <div>
-                      <strong>Question mix</strong>
-                      <small>Tune the counts.</small>
-                    </div>
-                  </div>
-                  <div className="paperCountGrid">
-                    <label>
-                      MCQ
-                      <input
-                        type="number"
-                        min="0"
-                        value={mcqCount}
-                        onChange={(event) => setMcqCount(Number(event.target.value))}
-                      />
-                    </label>
-                    <label>
-                      Short
-                      <input
-                        type="number"
-                        min="0"
-                        value={shortCount}
-                        onChange={(event) => setShortCount(Number(event.target.value))}
-                      />
-                    </label>
-                    <label>
-                      Long
-                      <input
-                        type="number"
-                        min="0"
-                        value={longCount}
-                        onChange={(event) => setLongCount(Number(event.target.value))}
-                      />
-                    </label>
-                  </div>
-                </section>
-              </form>
-
-              <aside className="paperBlueprint" aria-label="Paper blueprint">
-                <span className="canvasKicker">Blueprint</span>
-                <h4>{paperTitle || "Untitled paper"}</h4>
-                <p>
-                  {paperClassName || "Class"} · {paperSubject || "Subject"} ·{" "}
-                  {paperDifficulty}
-                </p>
-                <div className="blueprintReadiness">
-                  <CheckCircle2 size={18} />
-                  <span>
-                    {paperDocumentId
-                      ? "Ready to create an editable draft"
-                      : "Choose material to continue"}
-                  </span>
-                </div>
-                <div className="blueprintSource">
-                  <FileText size={18} />
-                  <span>
-                    {paperDocumentId
-                      ? documentNameById.get(Number(paperDocumentId)) ?? "Selected material"
-                      : "Choose prepared material"}
-                  </span>
-                </div>
-                <div className="blueprintGrid">
-                  <div>
-                    <strong>{mcqCount}</strong>
-                    <span>MCQ</span>
-                  </div>
-                  <div>
-                    <strong>{shortCount}</strong>
-                    <span>Short</span>
-                  </div>
-                  <div>
-                    <strong>{longCount}</strong>
-                    <span>Long</span>
-                  </div>
-                </div>
-                <div className="blueprintTotal">
-                  <strong>{mcqCount + shortCount + longCount}</strong>
-                  <span>questions planned</span>
-                </div>
-                <ul>
-                  <li>{paperOutputTypeLabel(paperOutputType)}</li>
-                  <li>{paperSourceModeLabel(paperSourceMode)}</li>
-                  <li>{paperTopic.trim() || "No topic filter"}</li>
-                </ul>
-                <button
-                  form="paper-create-form"
-                  className="paperCreateButton"
-                  disabled={!providerReady || busy === "paper-generate" || readyDocuments.length === 0}
-                  title={!providerReady ? providerSetupMessage : "Create editable paper"}
-                >
-                  {busy === "paper-generate" ? <Loader2 className="spin" size={16} /> : null}
-                  Create paper
-                </button>
-              </aside>
-            </div>
-
-            <div className="printableList">
-              {printables.length > 0 ? (
-                <div className="paperDraftQueueHeader">
-                  <div>
-                    <span className="canvasKicker">Draft queue</span>
-                    <h4>Review generated papers</h4>
-                  </div>
-                  <span>{pluralize(printables.length, "paper")}</span>
-                </div>
-              ) : null}
-              {printables.map((printable) => {
-                const latestJob = latestPrintableJobBySetId.get(printable.id);
-                const exportsForPrintable = printableExports[printable.id] ?? [];
-                const paperError = printable.error_message
-                  ? paperErrorMessage(printable.error_message)
-                  : null;
-                const isExporting =
-                  printable.status === "exporting" ||
-                  latestJob?.status === "queued" ||
-                  latestJob?.status === "running";
-                const hasSections = hasPrintableSections(printable);
-                const isExpanded = expandedPrintableId === printable.id;
-                const sectionCount = hasSections ? printable.content.sections.length : 0;
-                const questionCount = hasSections
-                  ? printable.content.sections.reduce(
-                      (total, section) => total + section.questions.length,
-                      0,
-                    )
-                  : 0;
-                return (
-                  <article key={printable.id} className="printableDraft">
-                    <div className="printableHeader">
-                      <div>
-                        <span className={`status ${printable.status}`}>{statusLabel(printable.status)}</span>
-                        <h4>{printable.title}</h4>
-                      </div>
-                      <div className="actions">
-                        {hasSections ? (
-                          <button
-                            type="button"
-                            className="draftToggleButton"
-                            onClick={() =>
-                              setExpandedPrintableId((current) =>
-                                current === printable.id ? null : printable.id,
-                              )
-                            }
-                          >
-                            {isExpanded ? "Close editor" : "Edit draft"}
-                          </button>
-                        ) : null}
-                        {isExpanded ? (
-                          <button
-                            onClick={() => void onSavePrintable(printable)}
-                            disabled={!hasSections || busy === `paper-save-${printable.id}`}
-                          >
-                            Save Changes
-                          </button>
-                        ) : null}
-                        <button
-                          onClick={() => void onExportPrintable(printable.id)}
-                          disabled={
-                            !hasSections ||
-                            isExporting ||
-                            busy === `paper-export-${printable.id}`
-                          }
-                        >
-                          Download Teacher Pack
-                        </button>
-                      </div>
-                    </div>
-
-                    {paperError ? (
-                      <div className="paperError" role="status">
-                        <AlertTriangle size={18} />
-                        <div>
-                          <strong>{paperError.title}</strong>
-                          <span>{paperError.detail}</span>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {hasSections && !isExpanded ? (
-                      <div className="paperDraftSummary" aria-label={`Draft summary for ${printable.title}`}>
-                        <div>
-                          <FileText size={20} />
-                          <span>{pluralize(sectionCount, "section")}</span>
-                        </div>
-                        <div>
-                          <ClipboardList size={20} />
-                          <span>{pluralize(questionCount, "question")}</span>
-                        </div>
-                        <div>
-                          <CheckCircle2 size={20} />
-                          <span>Ready to review</span>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {hasSections && isExpanded ? (
-                      <div className="draftEditor">
-                        {printable.content.sections.map((section, sectionIndex) => (
-                          <section key={`${printable.id}-${sectionIndex}`} className="draftSection">
-                            <div className="rowBetween">
-                              <h5>{section.title}</h5>
-                              <span>{section.marks} marks</span>
-                            </div>
-                            {section.questions.map((question, questionIndex) => (
-                              <article key={question.id} className="questionEditor">
-                                <label>
-                                  Question
-                                  <textarea
-                                    value={question.prompt}
-                                    onChange={(event) =>
-                                      updatePrintableQuestion(
-                                        printable.id,
-                                        sectionIndex,
-                                        questionIndex,
-                                        "prompt",
-                                        event.target.value,
-                                      )
-                                    }
-                                  />
-                                </label>
-                                <label>
-                                  Answer key
-                                  <textarea
-                                    value={question.answer}
-                                    onChange={(event) =>
-                                      updatePrintableQuestion(
-                                        printable.id,
-                                        sectionIndex,
-                                        questionIndex,
-                                        "answer",
-                                        event.target.value,
-                                      )
-                                    }
-                                  />
-                                </label>
-                                <span className="questionMeta">
-                                  {question.type.replace(/_/g, " ")} · {question.marks} marks
-                                </span>
-                              </article>
-                            ))}
-                          </section>
-                        ))}
-                      </div>
-                    ) : !hasSections && !paperError ? (
-                      <div className="paperDraftState pending">
-                        <Loader2 className={isExporting ? "spin" : ""} size={22} />
-                        <h3>Creating paper</h3>
-                        <p>You can keep working here while StudyGraph prepares the draft.</p>
-                      </div>
-                    ) : null}
-
-                    {exportsForPrintable.length > 0 ? (
-                      <div className="exportLinks">
-                        {exportsForPrintable.map((paperExport) => (
-                          <a
-                            key={paperExport.id}
-                            href={apiUrl(
-                              `/api/printables/${printable.id}/exports/${paperExport.id}`,
-                            )}
-                          >
-                            Download {paperExport.export_type.replace(/_/g, " ")}
-                          </a>
-                        ))}
-                      </div>
-                    ) : null}
-                  </article>
-                );
-              })}
-              {printables.length === 0 ? (
-                <div className="emptyState compact">
-                  <ClipboardList size={28} />
-                  <h3>No papers yet</h3>
-                  <p>Create a draft, edit it here, then download it when it is ready for class.</p>
-                </div>
-              ) : null}
-            </div>
-          </section>
-        ) : null}
-
-        {activeTab === "settings" ? (
-          <section className="settingsStudio">
-            <article className="panel preferencePanel">
-              <div className="settingsPanelHeader">
-                <span className="canvasKicker">Studio preferences</span>
-                <h3>Make StudyGraph comfortable</h3>
-                <p>Appearance choices are saved on this device and apply across the workspace.</p>
+                ) : null}
               </div>
 
-              <section className="themePreview" aria-label="Theme preview">
-                <div className="themePreviewTop">
-                  <span>{appTheme === "light" ? "Light workspace" : "Dark workspace"}</span>
-                  <strong>
-                    {textScale === "standard"
-                      ? "Standard text"
-                      : textScale === "comfortable"
-                        ? "Comfort text"
-                        : "Large text"}
-                  </strong>
-                </div>
-                <div className="themePreviewCard">
-                  <span className="themePreviewKicker">Answer preview</span>
-                  <p>StudyGraph keeps answers tied to your material across long sessions.</p>
-                  <div className="themePreviewChips">
-                    <span>Material ready</span>
-                    <span>{highContrast ? "High contrast" : "Standard contrast"}</span>
-                  </div>
-                </div>
-              </section>
-
-              <div className="preferenceGroup" aria-label="Theme preference">
-                <div>
-                  <strong>Theme</strong>
-                  <span>Choose the workspace tone for reading and editing.</span>
-                </div>
-                <div className="preferenceChoices">
-                  <button
-                    type="button"
-                    className={appTheme === "light" ? "active" : ""}
-                    aria-pressed={appTheme === "light"}
-                    onClick={() => setAppTheme("light")}
-                  >
-                    <Sun size={16} />
-                    Light
-                  </button>
-                  <button
-                    type="button"
-                    className={appTheme === "dark" ? "active" : ""}
-                    aria-pressed={appTheme === "dark"}
-                    onClick={() => setAppTheme("dark")}
-                  >
-                    <Moon size={16} />
-                    Dark
-                  </button>
-                </div>
-              </div>
-
-              <div className="preferenceGroup" aria-label="Reading size preference">
-                <div>
-                  <strong>Reading size</strong>
-                  <span>Adjust text size for longer study sessions.</span>
-                </div>
-                <div className="preferenceChoices three">
-                  {(["standard", "comfortable", "large"] as TextScale[]).map((scale) => (
-                    <button
-                      key={scale}
-                      type="button"
-                      className={textScale === scale ? "active" : ""}
-                      aria-pressed={textScale === scale}
-                      onClick={() => setTextScale(scale)}
-                    >
-                      {scale === "standard"
-                        ? "Standard"
-                        : scale === "comfortable"
-                          ? "Comfort"
-                          : "Large"}
+              {readyDocuments.length > 0 ? (
+                <div className="sgSuggestions" aria-label="Suggested prompts">
+                  {studyModes.map((mode) => (
+                    <button key={mode.id} type="button" onClick={() => runStudyMode(mode)}>
+                      {mode.title}
                     </button>
                   ))}
                 </div>
-              </div>
+              ) : null}
 
-              <div className="preferenceGroup" aria-label="Contrast preference">
-                <div>
-                  <strong>Contrast</strong>
-                  <span>Use stronger boundaries for controls and study content.</span>
+              <form className="sgComposer" onSubmit={(event) => void onAsk(event)}>
+                <div className="sgComposerInner">
+                  <textarea
+                    value={question}
+                    onChange={(event) => setQuestion(event.target.value)}
+                    placeholder="Ask a question, compare notes, or request examples..."
+                  />
+                  <button
+                    className="sgSend"
+                    disabled={!providerReady || busy === "ask" || !question.trim()}
+                    aria-label="Send"
+                    title={!providerReady ? providerSetupMessage : "Send"}
+                  >
+                    {busy === "ask" ? <Loader2 className="spin" size={16} /> : <Send size={16} />}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className={`preferenceToggle${highContrast ? " active" : ""}`}
-                  aria-pressed={highContrast}
-                  onClick={() => setHighContrast((current) => !current)}
-                >
-                  <Accessibility size={16} />
-                  {highContrast ? "High contrast on" : "High contrast off"}
-                </button>
-              </div>
-
-              <div className="preferenceSavedState" role="status">
-                <CheckCircle2 size={16} />
-                <span>Saved on this device</span>
-              </div>
-            </article>
-
-            <article className="panel connectionPanel">
-              <div className="settingsPanelHeader">
-                <span className="canvasKicker">System readiness</span>
-                <h3>Learning engine</h3>
-                <p>These checks show whether answers, study sets, and papers can use prepared material.</p>
-              </div>
-              <dl className="readinessList">
-                <dt>Status</dt>
-                <dd className={settings?.api_key_configured ? "configured" : "missing"}>
-                  {settings?.api_key_configured ? "Connected" : "Not connected"}
-                </dd>
-                <dt>Answers</dt>
-                <dd>{settings?.chat_model ?? "Not available"}</dd>
-                <dt>Material search</dt>
-                <dd>{settings?.embedding_model ?? "Not available"}</dd>
-              </dl>
-              <div className="readinessPulse" aria-label="Workspace readiness summary">
-                <div>
-                  <strong>{settings?.api_key_configured ? "Ready" : "Needs setup"}</strong>
-                  <span>
-                    {settings?.api_key_configured
-                      ? "Answers, study sets, and papers can use prepared material."
-                      : "Connect the learning engine to unlock answers and generated outputs."}
-                  </span>
-                </div>
-              </div>
-              <button type="button" className="recheckButton" onClick={() => void refresh()}>
-                <RefreshCcw size={16} />
-                Recheck
-              </button>
-            </article>
+              </form>
+            </aside>
           </section>
         ) : null}
+
+        {activeTab !== "rag" ? (
+          <div className="sgTabSurface">
+            {activeTab === "study" ? (
+              readerArtifact ? (
+                <section className={`readerMode ${appTheme}`} aria-label="Reader mode">
+                  <div className="readerTopbar">
+                    <button
+                      className="readerButton"
+                      onClick={() => setReaderArtifactId(null)}
+                      aria-label="Close reader"
+                      title="Close reader"
+                    >
+                      <X size={18} />
+                      Close
+                    </button>
+                    <button
+                      className="readerButton"
+                      onClick={toggleAppTheme}
+                      aria-label={themeToggleLabel}
+                      title={themeToggleLabel}
+                    >
+                      {appTheme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+                      {appTheme === "light" ? "Dark" : "Light"}
+                    </button>
+                  </div>
+
+                  <article className="readerArticle">
+                    <div className="readerMeta">
+                      <span>{artifactTypeLabel(readerArtifact.artifact_type)}</span>
+                      <span>{new Date(readerArtifact.updated_at).toLocaleDateString()}</span>
+                    </div>
+                    <h3>{artifactDisplayTitle(readerArtifact)}</h3>
+                    {readerArtifact.artifact_type === "summary" ? (
+                      <RichText
+                        className="readerBody"
+                        content={String(readerArtifact.content.summary || "")}
+                      />
+                    ) : (
+                      <div className="readerFlashcards">
+                        {Array.isArray(readerArtifact.content.flashcards)
+                          ? readerArtifact.content.flashcards.map((card, index) => (
+                              <div key={index} className="readerFlashcard">
+                                <span>Card {index + 1}</span>
+                                <strong>{String((card as { front?: string }).front || "")}</strong>
+                                <p>{String((card as { back?: string }).back || "")}</p>
+                              </div>
+                            ))
+                          : null}
+                      </div>
+                    )}
+                  </article>
+                </section>
+              ) : (
+                <section className="studyShelf">
+                  {focusedStudyArtifact ? (
+                    <div className="studyReviewGrid">
+                      <article className="reviewFocus" aria-label="Focused study set">
+                        <div className="reviewFocusTop">
+                          <div className="shelfType large" aria-hidden="true">
+                            {focusedStudyArtifact.artifact_type === "summary" ? (
+                              <FileText size={22} />
+                            ) : (
+                              <Layers size={22} />
+                            )}
+                          </div>
+                          <div>
+                            <span className="canvasKicker">
+                              {artifactTypeLabel(focusedStudyArtifact.artifact_type)}
+                            </span>
+                            <h4>{artifactDisplayTitle(focusedStudyArtifact)}</h4>
+                            <p>{focusedStudySource}</p>
+                          </div>
+                        </div>
+                        <div className="reviewFocusMeta" aria-label="Focused study set details">
+                          <span>{new Date(focusedStudyArtifact.updated_at).toLocaleDateString()}</span>
+                          <span>{artifactTypeLabel(focusedStudyArtifact.artifact_type)}</span>
+                          <span>{focusedStudySource}</span>
+                        </div>
+                        <div className="studyActionDeck" aria-label="Study set actions">
+                          <button
+                            className="readerOpenButton primary"
+                            onClick={() => setReaderArtifactId(focusedStudyArtifact.id)}
+                            aria-label={`Open focused reader for ${focusedStudyArtifact.title}`}
+                            title={`Open focused reader for ${focusedStudyArtifact.title}`}
+                          >
+                            <BookOpen size={16} />
+                            Open reader
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              askAboutStudySet(
+                                focusedStudyArtifact.artifact_type === "summary"
+                                  ? "Quiz me on the most important points in this summary."
+                                  : "Help me practice these flashcards with follow-up questions.",
+                                focusedStudyArtifact.document_id,
+                              )
+                            }
+                          >
+                            <HelpCircle size={16} />
+                            Quiz me
+                          </button>
+                          {focusedStudyArtifact.artifact_type === "summary" ? (
+                            <button
+                              type="button"
+                              disabled={
+                                focusedStudyArtifact.document_id < 0 ||
+                                (!artifactByDocumentAndType.get(
+                                  artifactKey(focusedStudyArtifact.document_id, "flashcards"),
+                                ) &&
+                                  (!providerReady ||
+                                    busy === `flashcards-${focusedStudyArtifact.document_id}`))
+                              }
+                              title={
+                                focusedStudyArtifact.document_id < 0
+                                  ? "Upload your own material to create flashcards"
+                                  : !providerReady &&
+                                      !artifactByDocumentAndType.get(
+                                        artifactKey(focusedStudyArtifact.document_id, "flashcards"),
+                                      )
+                                    ? providerSetupMessage
+                                    : "Create or open flashcards"
+                              }
+                              onClick={() =>
+                                void onArtifact("flashcards", focusedStudyArtifact.document_id)
+                              }
+                            >
+                              {busy === `flashcards-${focusedStudyArtifact.document_id}` ? (
+                                <Loader2 className="spin" size={16} />
+                              ) : (
+                                <Layers size={16} />
+                              )}
+                              Cards
+                            </button>
+                          ) : null}
+                        </div>
+                        {focusedStudyArtifact.artifact_type === "flashcards" && activePracticeCard ? (
+                          <div className="practicePanel" aria-label="Flashcard practice">
+                            <div className="practiceSession" aria-label="Practice progress">
+                              <div className="practiceSessionCopy">
+                                <span>{practiceCue}</span>
+                                <strong>{practiceProgress}</strong>
+                              </div>
+                              <div
+                                className="practiceProgressTrack"
+                                aria-hidden="true"
+                                style={{ "--practice-progress": `${practicePercent}%` } as CSSProperties}
+                              />
+                              <div className="practiceSessionStats">
+                                <span>{practiceRemaining} left</span>
+                                <span>{practiceMasteredCount} remembered</span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className={`practiceCard${practiceRevealed ? " revealed" : ""}`}
+                              onClick={() => setPracticeRevealed((current) => !current)}
+                              aria-label={practiceRevealed ? "Hide answer" : "Reveal answer"}
+                            >
+                              <span>{practiceRevealed ? "Answer" : "Prompt"}</span>
+                              <strong>
+                                {practiceRevealed
+                                  ? activePracticeCard.back || "No answer saved."
+                                  : activePracticeCard.front || "No prompt saved."}
+                              </strong>
+                              <small>{practiceRevealed ? "Tap to hide" : "Tap to reveal"}</small>
+                            </button>
+                            <div className="practiceControls">
+                              <button type="button" onClick={() => setPracticeRevealed(true)}>
+                                Reveal
+                              </button>
+                              <button type="button" onClick={goToNextPracticeCard}>
+                                Again
+                              </button>
+                              <button type="button" className="primary" onClick={markPracticeCardMastered}>
+                                Got it
+                              </button>
+                              <button
+                                type="button"
+                                className="iconOnly"
+                                onClick={resetPracticeSession}
+                                aria-label="Restart flashcard practice"
+                                title="Restart practice"
+                              >
+                                <RefreshCcw size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <RichText
+                            className="reviewFocusPreview"
+                            content={
+                              focusedStudyArtifact.artifact_type === "summary"
+                                ? String(focusedStudyArtifact.content.summary || "")
+                                : focusedStudyPreview || "Open the reader to review this study set."
+                            }
+                          />
+                        )}
+                      </article>
+
+                      <aside className="reviewQueue" aria-label="Saved study sets">
+                        <div className="reviewQueueHeader">
+                          <div>
+                            <span className="canvasKicker">Queue</span>
+                            <h3>Review queue</h3>
+                          </div>
+                          <strong>{pluralize(artifacts.length, "set")}</strong>
+                        </div>
+                        <div className="shelfList">
+                          {artifacts.map((artifact) => {
+                            const sourceName =
+                              documentNameById.get(artifact.document_id) ??
+                              `Material #${artifact.document_id}`;
+                            const previewText = compactPreviewText(artifactPreviewText(artifact), 96);
+                            const isFocused = focusedStudyArtifact?.id === artifact.id;
+
+                            return (
+                              <article
+                                key={artifact.id}
+                                className={`shelfItem compact ${isFocused ? "active" : ""}`}
+                              >
+                                <div className="shelfType" aria-hidden="true">
+                                  {artifact.artifact_type === "summary" ? (
+                                    <FileText size={18} />
+                                  ) : (
+                                    <Layers size={18} />
+                                  )}
+                                </div>
+                                <div className="shelfItemMain">
+                                  <div className="shelfItemMeta">
+                                    <span>{artifactTypeLabel(artifact.artifact_type)}</span>
+                                    <span>{new Date(artifact.updated_at).toLocaleDateString()}</span>
+                                  </div>
+                                  <h4>{artifactDisplayTitle(artifact)}</h4>
+                                  <p>{previewText || "Open the reader to review this study set."}</p>
+                                  <small>{sourceName}</small>
+                                </div>
+                                <div className="shelfItemActions">
+                                  <button
+                                    className="shelfPreviewButton"
+                                    type="button"
+                                    disabled={isFocused}
+                                    onClick={() => setFocusedArtifactId(artifact.id)}
+                                    aria-label={`Preview ${artifact.title}`}
+                                    title={`Preview ${artifact.title}`}
+                                  >
+                                    {isFocused ? "In focus" : "Preview"}
+                                  </button>
+                                  <button
+                                    className="readerOpenButton"
+                                    onClick={() => setReaderArtifactId(artifact.id)}
+                                    aria-label={`Open reader for ${artifact.title}`}
+                                    title={`Open reader for ${artifact.title}`}
+                                  >
+                                    <BookOpen size={16} />
+                                    Reader
+                                  </button>
+                                </div>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      </aside>
+                    </div>
+                  ) : (
+                    <div className="emptyState compact">
+                      <Layers size={22} />
+                      <h3>No study sets yet</h3>
+                      <p>Create a summary or flashcards from prepared material.</p>
+                    </div>
+                  )}
+                </section>
+              )
+            ) : null}
+
+            {activeTab === "printables" ? (
+              <section className="panel paperBuilder">
+                <div className="panelHeader paperStudioHeader">
+                  <div>
+                    <span className="canvasKicker">Paper studio</span>
+                    <h3>Create from class material</h3>
+                    <p>Pick the moment, shape the questions, and review before download.</p>
+                  </div>
+                </div>
+
+                <section className="paperLaunchPad" aria-label="Paper starting points">
+                  <div>
+                    <span className="canvasKicker">Start with</span>
+                    <h4>Pick the classroom moment</h4>
+                  </div>
+                  <div className="paperLaunchOptions">
+                    <button
+                      type="button"
+                      aria-label="Use quick check preset, 7 questions"
+                      onClick={() =>
+                        applyPaperPreset("quick_check", "worksheet_pack", "easy", {
+                          mcq: 4,
+                          short: 3,
+                          long: 0,
+                        })
+                      }
+                    >
+                      <CheckCircle2 size={17} />
+                      <strong>Quick check</strong>
+                      <span>7 questions</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Use balanced preset, 12 questions"
+                      onClick={() =>
+                        applyPaperPreset("balanced", "teacher_pack", "medium", {
+                          mcq: 5,
+                          short: 5,
+                          long: 2,
+                        })
+                      }
+                    >
+                      <ClipboardList size={17} />
+                      <strong>Balanced</strong>
+                      <span>12 questions</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Use exam prep preset, 17 questions"
+                      onClick={() =>
+                        applyPaperPreset("exam", "exam_variants", "hard", {
+                          mcq: 8,
+                          short: 6,
+                          long: 3,
+                        })
+                      }
+                    >
+                      <Clock3 size={17} />
+                      <strong>Exam prep</strong>
+                      <span>17 questions</span>
+                    </button>
+                  </div>
+                </section>
+
+                <div className="paperStudio">
+                  <form
+                    id="paper-create-form"
+                    className="paperWizard"
+                    onSubmit={(event) => void onCreatePrintable(event)}
+                  >
+                    <div className="paperStepRail" aria-label="Paper setup steps">
+                      <button type="button" onClick={() => scrollPaperStep("paper-step-source")}>
+                        Source
+                      </button>
+                      <button type="button" onClick={() => scrollPaperStep("paper-step-format")}>
+                        Format
+                      </button>
+                      <button type="button" onClick={() => scrollPaperStep("paper-step-classroom")}>
+                        Classroom
+                      </button>
+                      <button type="button" onClick={() => scrollPaperStep("paper-step-mix")}>
+                        Mix
+                      </button>
+                    </div>
+                    <section id="paper-step-source" className="paperWizardSection wideField">
+                      <div className="paperWizardStep">
+                        <span>1</span>
+                        <div>
+                          <strong>Source</strong>
+                          <small>Pick the material and scope.</small>
+                        </div>
+                      </div>
+                      <label>
+                        Class material
+                        <select
+                          value={paperDocumentId}
+                          onChange={(event) =>
+                            setPaperDocumentId(event.target.value ? Number(event.target.value) : "")
+                          }
+                        >
+                          <option value="">Choose prepared material</option>
+                          {readyDocuments.map((document) => (
+                            <option key={document.id} value={document.id}>
+                              {document.filename}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Topic or range
+                        <input
+                          value={paperTopic}
+                          onChange={(event) => setPaperTopic(event.target.value)}
+                          placeholder="Optional topic, chapter, or page range"
+                        />
+                      </label>
+                    </section>
+
+                    <section id="paper-step-format" className="paperWizardSection">
+                      <div className="paperWizardStep">
+                        <span>2</span>
+                        <div>
+                          <strong>Format</strong>
+                          <small>Choose what students receive.</small>
+                        </div>
+                      </div>
+                      <label>
+                        Paper title
+                        <input
+                          aria-label="Paper title"
+                          value={paperTitle}
+                          onChange={(event) => setPaperTitle(event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Paper type
+                        <select
+                          value={paperOutputType}
+                          onChange={(event) => setPaperOutputType(event.target.value)}
+                        >
+                          <option value="question_paper">Question paper only</option>
+                          <option value="teacher_pack">Question paper + answer key</option>
+                          <option value="worksheet_pack">Worksheet pack</option>
+                          <option value="exam_variants">Quiz/exam variants</option>
+                        </select>
+                      </label>
+                      <label>
+                        Material scope
+                        <select
+                          value={paperSourceMode}
+                          onChange={(event) => setPaperSourceMode(event.target.value)}
+                        >
+                          <option value="whole_book">Whole book</option>
+                          <option value="chapter_or_pages">Chapter or page range</option>
+                          <option value="topic">Topic</option>
+                        </select>
+                      </label>
+                    </section>
+
+                    <section id="paper-step-classroom" className="paperWizardSection">
+                      <div className="paperWizardStep">
+                        <span>3</span>
+                        <div>
+                          <strong>Classroom</strong>
+                          <small>Match the learners.</small>
+                        </div>
+                      </div>
+                      <label>
+                        Class
+                        <input
+                          value={paperClassName}
+                          onChange={(event) => setPaperClassName(event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Subject
+                        <input
+                          value={paperSubject}
+                          onChange={(event) => setPaperSubject(event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Difficulty
+                        <select
+                          value={paperDifficulty}
+                          onChange={(event) => setPaperDifficulty(event.target.value)}
+                        >
+                          <option value="easy">Easy</option>
+                          <option value="medium">Medium</option>
+                          <option value="hard">Hard</option>
+                        </select>
+                      </label>
+                    </section>
+
+                    <section id="paper-step-mix" className="paperWizardSection wideField paperMixSection">
+                      <div className="paperWizardStep">
+                        <span>4</span>
+                        <div>
+                          <strong>Question mix</strong>
+                          <small>Tune the counts.</small>
+                        </div>
+                      </div>
+                      <div className="paperCountGrid">
+                        <label>
+                          MCQ
+                          <input
+                            type="number"
+                            min="0"
+                            value={mcqCount}
+                            onChange={(event) => setMcqCount(Number(event.target.value))}
+                          />
+                        </label>
+                        <label>
+                          Short
+                          <input
+                            type="number"
+                            min="0"
+                            value={shortCount}
+                            onChange={(event) => setShortCount(Number(event.target.value))}
+                          />
+                        </label>
+                        <label>
+                          Long
+                          <input
+                            type="number"
+                            min="0"
+                            value={longCount}
+                            onChange={(event) => setLongCount(Number(event.target.value))}
+                          />
+                        </label>
+                      </div>
+                    </section>
+                  </form>
+
+                  <aside className="paperBlueprint" aria-label="Paper blueprint">
+                    <span className="canvasKicker">Blueprint</span>
+                    <h4>{paperTitle || "Untitled paper"}</h4>
+                    <p>
+                      {paperClassName || "Class"} · {paperSubject || "Subject"} ·{" "}
+                      {paperDifficulty}
+                    </p>
+                    <div className="blueprintReadiness">
+                      <CheckCircle2 size={18} />
+                      <span>
+                        {paperDocumentId
+                          ? "Ready to create an editable draft"
+                          : "Choose material to continue"}
+                      </span>
+                    </div>
+                    <div className="blueprintSource">
+                      <FileText size={18} />
+                      <span>
+                        {paperDocumentId
+                          ? documentNameById.get(Number(paperDocumentId)) ?? "Selected material"
+                          : "Choose prepared material"}
+                      </span>
+                    </div>
+                    <div className="blueprintGrid">
+                      <div>
+                        <strong>{mcqCount}</strong>
+                        <span>MCQ</span>
+                      </div>
+                      <div>
+                        <strong>{shortCount}</strong>
+                        <span>Short</span>
+                      </div>
+                      <div>
+                        <strong>{longCount}</strong>
+                        <span>Long</span>
+                      </div>
+                    </div>
+                    <div className="blueprintTotal">
+                      <strong>{mcqCount + shortCount + longCount}</strong>
+                      <span>questions planned</span>
+                    </div>
+                    <ul>
+                      <li>{paperOutputTypeLabel(paperOutputType)}</li>
+                      <li>{paperSourceModeLabel(paperSourceMode)}</li>
+                      <li>{paperTopic.trim() || "No topic filter"}</li>
+                    </ul>
+                    <button
+                      form="paper-create-form"
+                      className="paperCreateButton"
+                      disabled={!providerReady || busy === "paper-generate" || readyDocuments.length === 0}
+                      title={!providerReady ? providerSetupMessage : "Create editable paper"}
+                    >
+                      {busy === "paper-generate" ? <Loader2 className="spin" size={16} /> : null}
+                      Create paper
+                    </button>
+                  </aside>
+                </div>
+
+                <div className="printableList">
+                  {printables.length > 0 ? (
+                    <div className="paperDraftQueueHeader">
+                      <div>
+                        <span className="canvasKicker">Draft queue</span>
+                        <h4>Review generated papers</h4>
+                      </div>
+                      <span>{pluralize(printables.length, "paper")}</span>
+                    </div>
+                  ) : null}
+                  {printables.map((printable) => {
+                    const latestJob = latestPrintableJobBySetId.get(printable.id);
+                    const exportsForPrintable = printableExports[printable.id] ?? [];
+                    const paperError = printable.error_message
+                      ? paperErrorMessage(printable.error_message)
+                      : null;
+                    const isExporting =
+                      printable.status === "exporting" ||
+                      latestJob?.status === "queued" ||
+                      latestJob?.status === "running";
+                    const hasSections = hasPrintableSections(printable);
+                    const isExpanded = expandedPrintableId === printable.id;
+                    const sectionCount = hasSections ? printable.content.sections.length : 0;
+                    const questionCount = hasSections
+                      ? printable.content.sections.reduce(
+                          (total, section) => total + section.questions.length,
+                          0,
+                        )
+                      : 0;
+                    return (
+                      <article key={printable.id} className="printableDraft">
+                        <div className="printableHeader">
+                          <div>
+                            <span className={`status ${printable.status}`}>{statusLabel(printable.status)}</span>
+                            <h4>{printable.title}</h4>
+                          </div>
+                          <div className="actions">
+                            {hasSections ? (
+                              <button
+                                type="button"
+                                className="draftToggleButton"
+                                onClick={() =>
+                                  setExpandedPrintableId((current) =>
+                                    current === printable.id ? null : printable.id,
+                                  )
+                                }
+                              >
+                                {isExpanded ? "Close editor" : "Edit draft"}
+                              </button>
+                            ) : null}
+                            {isExpanded ? (
+                              <button
+                                onClick={() => void onSavePrintable(printable)}
+                                disabled={!hasSections || busy === `paper-save-${printable.id}`}
+                              >
+                                Save Changes
+                              </button>
+                            ) : null}
+                            <button
+                              onClick={() => void onExportPrintable(printable.id)}
+                              disabled={
+                                !hasSections ||
+                                isExporting ||
+                                busy === `paper-export-${printable.id}`
+                              }
+                            >
+                              Download Teacher Pack
+                            </button>
+                          </div>
+                        </div>
+
+                        {paperError ? (
+                          <div className="paperError" role="status">
+                            <AlertTriangle size={18} />
+                            <div>
+                              <strong>{paperError.title}</strong>
+                              <span>{paperError.detail}</span>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {hasSections && !isExpanded ? (
+                          <div className="paperDraftSummary" aria-label={`Draft summary for ${printable.title}`}>
+                            <div>
+                              <FileText size={20} />
+                              <span>{pluralize(sectionCount, "section")}</span>
+                            </div>
+                            <div>
+                              <ClipboardList size={20} />
+                              <span>{pluralize(questionCount, "question")}</span>
+                            </div>
+                            <div>
+                              <CheckCircle2 size={20} />
+                              <span>Ready to review</span>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {hasSections && isExpanded ? (
+                          <div className="draftEditor">
+                            {printable.content.sections.map((section, sectionIndex) => (
+                              <section key={`${printable.id}-${sectionIndex}`} className="draftSection">
+                                <div className="rowBetween">
+                                  <h5>{section.title}</h5>
+                                  <span>{section.marks} marks</span>
+                                </div>
+                                {section.questions.map((question, questionIndex) => (
+                                  <article key={question.id} className="questionEditor">
+                                    <label>
+                                      Question
+                                      <textarea
+                                        value={question.prompt}
+                                        onChange={(event) =>
+                                          updatePrintableQuestion(
+                                            printable.id,
+                                            sectionIndex,
+                                            questionIndex,
+                                            "prompt",
+                                            event.target.value,
+                                          )
+                                        }
+                                      />
+                                    </label>
+                                    <label>
+                                      Answer key
+                                      <textarea
+                                        value={question.answer}
+                                        onChange={(event) =>
+                                          updatePrintableQuestion(
+                                            printable.id,
+                                            sectionIndex,
+                                            questionIndex,
+                                            "answer",
+                                            event.target.value,
+                                          )
+                                        }
+                                      />
+                                    </label>
+                                    <span className="questionMeta">
+                                      {question.type.replace(/_/g, " ")} · {question.marks} marks
+                                    </span>
+                                  </article>
+                                ))}
+                              </section>
+                            ))}
+                          </div>
+                        ) : !hasSections && !paperError ? (
+                          <div className="paperDraftState pending">
+                            <Loader2 className={isExporting ? "spin" : ""} size={22} />
+                            <h3>Creating paper</h3>
+                            <p>You can keep working here while StudyGraph prepares the draft.</p>
+                          </div>
+                        ) : null}
+
+                        {exportsForPrintable.length > 0 ? (
+                          <div className="exportLinks">
+                            {exportsForPrintable.map((paperExport) => (
+                              <a
+                                key={paperExport.id}
+                                href={apiUrl(
+                                  `/api/printables/${printable.id}/exports/${paperExport.id}`,
+                                )}
+                              >
+                                Download {paperExport.export_type.replace(/_/g, " ")}
+                              </a>
+                            ))}
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                  {printables.length === 0 ? (
+                    <div className="emptyState compact">
+                      <ClipboardList size={28} />
+                      <h3>No papers yet</h3>
+                      <p>Create a draft, edit it here, then download it when it is ready for class.</p>
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+
+            {activeTab === "settings" ? (
+              <section className="settingsStudio">
+                <article className="panel preferencePanel">
+                  <div className="settingsPanelHeader">
+                    <span className="canvasKicker">Studio preferences</span>
+                    <h3>Make StudyGraph comfortable</h3>
+                    <p>Appearance choices are saved on this device and apply across the workspace.</p>
+                  </div>
+
+                  <section className="themePreview" aria-label="Theme preview">
+                    <div className="themePreviewTop">
+                      <span>{appTheme === "light" ? "Light workspace" : "Dark workspace"}</span>
+                      <strong>
+                        {textScale === "standard"
+                          ? "Standard text"
+                          : textScale === "comfortable"
+                            ? "Comfort text"
+                            : "Large text"}
+                      </strong>
+                    </div>
+                    <div className="themePreviewCard">
+                      <span className="themePreviewKicker">Answer preview</span>
+                      <p>StudyGraph keeps answers tied to your material across long sessions.</p>
+                      <div className="themePreviewChips">
+                        <span>Material ready</span>
+                        <span>{highContrast ? "High contrast" : "Standard contrast"}</span>
+                      </div>
+                    </div>
+                  </section>
+
+                  <div className="preferenceGroup" aria-label="Theme preference">
+                    <div>
+                      <strong>Theme</strong>
+                      <span>Choose the workspace tone for reading and editing.</span>
+                    </div>
+                    <div className="preferenceChoices">
+                      <button
+                        type="button"
+                        className={appTheme === "light" ? "active" : ""}
+                        aria-pressed={appTheme === "light"}
+                        onClick={() => setAppTheme("light")}
+                      >
+                        <Sun size={16} />
+                        Light
+                      </button>
+                      <button
+                        type="button"
+                        className={appTheme === "dark" ? "active" : ""}
+                        aria-pressed={appTheme === "dark"}
+                        onClick={() => setAppTheme("dark")}
+                      >
+                        <Moon size={16} />
+                        Dark
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="preferenceGroup" aria-label="Reading size preference">
+                    <div>
+                      <strong>Reading size</strong>
+                      <span>Adjust text size for longer study sessions.</span>
+                    </div>
+                    <div className="preferenceChoices three">
+                      {(["standard", "comfortable", "large"] as TextScale[]).map((scale) => (
+                        <button
+                          key={scale}
+                          type="button"
+                          className={textScale === scale ? "active" : ""}
+                          aria-pressed={textScale === scale}
+                          onClick={() => setTextScale(scale)}
+                        >
+                          {scale === "standard"
+                            ? "Standard"
+                            : scale === "comfortable"
+                              ? "Comfort"
+                              : "Large"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="preferenceGroup" aria-label="Contrast preference">
+                    <div>
+                      <strong>Contrast</strong>
+                      <span>Use stronger boundaries for controls and study content.</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={`preferenceToggle${highContrast ? " active" : ""}`}
+                      aria-pressed={highContrast}
+                      onClick={() => setHighContrast((current) => !current)}
+                    >
+                      <Accessibility size={16} />
+                      {highContrast ? "High contrast on" : "High contrast off"}
+                    </button>
+                  </div>
+
+                  <div className="preferenceSavedState" role="status">
+                    <CheckCircle2 size={16} />
+                    <span>Saved on this device</span>
+                  </div>
+                </article>
+
+                <article className="panel connectionPanel">
+                  <div className="settingsPanelHeader">
+                    <span className="canvasKicker">System readiness</span>
+                    <h3>Learning engine</h3>
+                    <p>These checks show whether answers, study sets, and papers can use prepared material.</p>
+                  </div>
+                  <dl className="readinessList">
+                    <dt>Status</dt>
+                    <dd className={settings?.api_key_configured ? "configured" : "missing"}>
+                      {settings?.api_key_configured ? "Connected" : "Not connected"}
+                    </dd>
+                    <dt>Answers</dt>
+                    <dd>{settings?.chat_model ?? "Not available"}</dd>
+                    <dt>Material search</dt>
+                    <dd>{settings?.embedding_model ?? "Not available"}</dd>
+                  </dl>
+                  <div className="readinessPulse" aria-label="Workspace readiness summary">
+                    <div>
+                      <strong>{settings?.api_key_configured ? "Ready" : "Needs setup"}</strong>
+                      <span>
+                        {settings?.api_key_configured
+                          ? "Answers, study sets, and papers can use prepared material."
+                          : "Connect the learning engine to unlock answers and generated outputs."}
+                      </span>
+                    </div>
+                  </div>
+                  <button type="button" className="recheckButton" onClick={() => void refresh()}>
+                    <RefreshCcw size={16} />
+                    Recheck
+                  </button>
+                </article>
+              </section>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      {activeTab === "rag" ? (
+        <nav className="sgMobileTabs" aria-label="Mobile workspace">
+          <button
+            type="button"
+            className={mobileView === "files" ? "active" : ""}
+            aria-pressed={mobileView === "files"}
+            onClick={() => {
+              setMobileView("files");
+              setIsLibraryCollapsed(false);
+            }}
+          >
+            Files
+          </button>
+          <button
+            type="button"
+            className={mobileView === "read" ? "active" : ""}
+            aria-pressed={mobileView === "read"}
+            onClick={() => setMobileView("read")}
+          >
+            Read
+          </button>
+          <button
+            type="button"
+            className={mobileView === "chat" ? "active" : ""}
+            aria-pressed={mobileView === "chat"}
+            onClick={() => setMobileView("chat")}
+          >
+            Chat
+          </button>
+        </nav>
+      ) : null}
+
+      {pendingDelete ? (
+        <div
+          className="sgConfirmBackdrop open"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setPendingDelete(null);
+            }
+          }}
+        >
+          <div
+            className="sgConfirmDialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sgConfirmTitle"
+            aria-describedby="sgConfirmDescription"
+          >
+            <h2 id="sgConfirmTitle">
+              {pendingDelete.type === "document" ? "Delete document?" : "Delete conversation?"}
+            </h2>
+            <p id="sgConfirmDescription">
+              {pendingDelete.type === "document"
+                ? `Remove "${pendingDelete.name}" and its study sets from your workspace? This cannot be undone.`
+                : `Delete the "${pendingDelete.name}" conversation and its messages? This cannot be undone.`}
+            </p>
+            <div className="sgConfirmActions">
+              <button
+                type="button"
+                className="sgCancelDelete"
+                onClick={() => setPendingDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                ref={confirmDeleteRef}
+                type="button"
+                className="sgConfirmDelete"
+                onClick={() => void confirmPendingDelete()}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
-      </main>
+      ) : null}
     </div>
   );
 }

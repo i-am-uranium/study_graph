@@ -5523,3 +5523,1054 @@ dd {
 .theme-dark .readerBody p {
   line-height: 1.68;
 }
+
+/* ============================================================================
+   StudyGraph redesign — three-zone teacher-first studio
+   Self-contained `sg*` components themed via the existing CSS variables so the
+   .theme-dark / .text-* / .contrast-high modifiers keep working everywhere.
+   ============================================================================ */
+
+.sgShell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.sgTopbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  height: 72px;
+  padding: 0 34px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.sgBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 180px;
+  font-weight: 760;
+  letter-spacing: -0.01em;
+}
+
+.sgMark {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.sgMark img {
+  width: 22px;
+  height: 22px;
+}
+
+.sgBrandName {
+  font-size: 18px;
+}
+
+.sgMainNav {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-soft);
+}
+
+.sgNavPill {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.sgNavPill:hover {
+  color: var(--ink);
+}
+
+.sgNavPill.active {
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+.sgTopActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 180px;
+  justify-content: flex-end;
+}
+
+.sgBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.sgBanner {
+  width: min(1480px, calc(100vw - 44px));
+  margin: 16px auto 0;
+}
+
+.sgWorkspace {
+  width: min(1480px, calc(100vw - 44px));
+  margin: 22px auto 40px;
+  display: grid;
+  grid-template-columns: 280px minmax(420px, 1fr) 430px;
+  gap: 18px;
+  align-items: start;
+}
+
+.sgWorkspace.library-collapsed {
+  grid-template-columns: 76px minmax(520px, 1fr) 430px;
+}
+
+.sgPanel {
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+/* ---- Library ------------------------------------------------------------- */
+
+.sgLibrary {
+  position: sticky;
+  top: 96px;
+  height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  overflow: hidden auto;
+  transition: padding 0.2s ease;
+}
+
+.sgLibraryTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sgCollapseRail {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--primary);
+  border: 1px solid var(--line);
+}
+
+.sgWorkspace.library-collapsed .sgCollapseRail svg {
+  transform: rotate(180deg);
+}
+
+.sgUpload {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  border: 1px dashed color-mix(in srgb, var(--primary) 42%, transparent);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sgUpload input {
+  display: none;
+}
+
+.sgUpload.dragActive {
+  background: color-mix(in srgb, var(--primary) 18%, var(--surface));
+  border-style: solid;
+}
+
+.sgRailActions {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.sgRailTab {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.sgRailTab:hover {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.sgWorkspace.library-collapsed .sgLibrary {
+  align-items: center;
+  padding: 12px;
+}
+
+.sgWorkspace.library-collapsed .sgUpload,
+.sgWorkspace.library-collapsed .sgLibrarySection {
+  display: none;
+}
+
+.sgWorkspace.library-collapsed .sgLibraryTop {
+  flex-direction: column;
+}
+
+.sgWorkspace.library-collapsed .sgRailActions {
+  display: flex;
+  width: 100%;
+}
+
+.sgLibrarySection {
+  min-width: 0;
+}
+
+.sgSectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 4px 2px 8px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 740;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sgSectionTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.sgSectionChevron {
+  color: var(--primary);
+  transition: transform 0.16s ease;
+}
+
+.sgLibrarySection.collapsed .sgSectionChevron {
+  transform: rotate(-90deg);
+}
+
+.sgLibrarySection.collapsed .sgDocList,
+.sgLibrarySection.collapsed .sgThreadList {
+  display: none;
+}
+
+.sgSectionActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sgCount {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sgNewThread {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 12px;
+  font-weight: 720;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.sgDocList,
+.sgThreadList {
+  display: grid;
+  gap: 8px;
+}
+
+.sgDocItem,
+.sgThread {
+  position: relative;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.sgDocItem.active,
+.sgThread.active {
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--line));
+  background: color-mix(in srgb, var(--primary-soft) 60%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.sgItemOpen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  padding: 12px 40px 12px 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  border-radius: 14px;
+}
+
+.sgItemOpen:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.sgItemTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.sgItemName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sgItemMeta {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sgStatusDot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--success);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 16%, transparent);
+}
+
+.sgPreparePill {
+  position: absolute;
+  bottom: 10px;
+  right: 9px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sgDeleteItem {
+  position: absolute;
+  top: 11px;
+  right: 9px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid transparent;
+  opacity: 0;
+  transition: opacity 0.16s ease, background 0.16s ease, color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.sgDocItem:hover .sgDeleteItem,
+.sgDocItem:focus-within .sgDeleteItem,
+.sgThread:hover .sgDeleteItem,
+.sgThread:focus-within .sgDeleteItem {
+  opacity: 1;
+}
+
+.sgDeleteItem:hover,
+.sgDeleteItem:focus-visible {
+  opacity: 1;
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 26%, transparent);
+  color: var(--danger);
+}
+
+@media (hover: none) {
+  .sgDeleteItem {
+    opacity: 1;
+  }
+}
+
+.sgEmptyState {
+  padding: 16px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+}
+
+/* ---- Document workspace -------------------------------------------------- */
+
+.sgStudy {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.sgStudyHeader {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sgStudyHeader h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(24px, 3vw, 36px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.sgHeaderSubtitle {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+  max-width: 620px;
+}
+
+.sgSourceStrip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-soft) 70%, transparent);
+}
+
+.sgSourceChips {
+  display: flex;
+  gap: 8px;
+  overflow: auto;
+  scrollbar-width: none;
+}
+
+.sgSourceChips::-webkit-scrollbar {
+  display: none;
+}
+
+.sgChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 680;
+  white-space: nowrap;
+}
+
+.sgChip.active {
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+.sgPrimaryAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 13px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.sgPrimaryAction:disabled {
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+
+.sgDocument {
+  flex: 1;
+  padding: 22px;
+  min-height: calc(100vh - 280px);
+  overflow: auto;
+  background-image: linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(var(--grid-line) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+.sgPaper {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: clamp(22px, 4vw, 44px);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-soft);
+}
+
+.sgPaper h2 {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: clamp(24px, 3vw, 31px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.sgPaperBody,
+.sgPaperGuide p {
+  font-family: var(--font-reading);
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.sgPaperGuide p {
+  margin: 0 0 18px;
+  max-width: 60ch;
+}
+
+.sgGhostAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.sgGhostAction:hover {
+  border-color: var(--line-strong);
+}
+
+.sgOnboarding {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 6px;
+}
+
+.sgOnboardingMark {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  margin-bottom: 6px;
+}
+
+.sgOnboarding p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  max-width: 46ch;
+  line-height: 1.6;
+}
+
+.sgOnboardingActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.sgOnboardingUpload {
+  cursor: pointer;
+}
+
+.sgOnboardingUpload input {
+  display: none;
+}
+
+/* ---- Chat ---------------------------------------------------------------- */
+
+.sgChat {
+  position: sticky;
+  top: 96px;
+  height: calc(100vh - 120px);
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  overflow: hidden;
+}
+
+.sgChatHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sgChatTitle strong {
+  display: block;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.sgChatTitle span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sgMiniAction {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.sgMessages {
+  padding: 18px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sgMessage {
+  display: grid;
+  gap: 7px;
+  max-width: 92%;
+}
+
+.sgMessage.user {
+  align-self: end;
+  justify-items: end;
+}
+
+.sgBubble {
+  padding: 12px 15px;
+  border-radius: 17px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.sgMessage.assistant .sgBubble {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-soft);
+}
+
+.sgMessage.user .sgBubble {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-bottom-right-radius: 5px;
+}
+
+.sgBubble p {
+  margin: 0;
+}
+
+.sgAssistantLabel {
+  color: var(--primary-strong);
+  font-size: 11px;
+  font-weight: 820;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sgCitationRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.sgCitation {
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sgSuggestions {
+  display: flex;
+  gap: 8px;
+  overflow: auto;
+  padding: 0 16px 12px;
+  scrollbar-width: none;
+}
+
+.sgSuggestions::-webkit-scrollbar {
+  display: none;
+}
+
+.sgSuggestions button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.sgSuggestions button:hover {
+  border-color: var(--line-strong);
+}
+
+.sgComposer {
+  padding: 12px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+}
+
+.sgComposerInner {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px;
+  align-items: end;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  box-shadow: var(--shadow-soft);
+}
+
+.sgComposerInner textarea {
+  width: 100%;
+  min-height: 48px;
+  max-height: 128px;
+  resize: vertical;
+  border: 0;
+  outline: 0;
+  padding: 9px 10px;
+  color: var(--ink);
+  background: transparent;
+  font-family: var(--font-sans);
+}
+
+.sgSend {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.sgSend:disabled {
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+
+/* ---- Other tabs container ------------------------------------------------ */
+
+.sgTabSurface {
+  width: min(1480px, calc(100vw - 44px));
+  margin: 22px auto 56px;
+}
+
+/* ---- Mobile bottom tabs -------------------------------------------------- */
+
+.sgMobileTabs {
+  display: none;
+}
+
+/* ---- Delete confirmation dialog ----------------------------------------- */
+
+.sgConfirmBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--ink) 32%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.sgConfirmDialog {
+  width: min(420px, 100%);
+  padding: 22px;
+  border-radius: 18px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.sgConfirmDialog h2 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.sgConfirmDialog p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.sgConfirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.sgConfirmActions button {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 740;
+}
+
+.sgCancelDelete {
+  background: var(--surface-soft);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.sgConfirmDelete {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* ---- Responsive ---------------------------------------------------------- */
+
+@media (max-width: 1180px) {
+  .sgWorkspace {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .sgWorkspace.library-collapsed {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
+  .sgChat {
+    grid-column: 1 / -1;
+    position: relative;
+    top: auto;
+    height: 620px;
+  }
+}
+
+@media (max-width: 820px) {
+  .sgTopbar {
+    height: 64px;
+    padding: 0 16px;
+  }
+
+  .sgBrand {
+    min-width: auto;
+  }
+
+  .sgBrandName,
+  .sgMainNav {
+    display: none;
+  }
+
+  .sgTopActions {
+    min-width: auto;
+  }
+
+  .sgBanner {
+    width: calc(100vw - 24px);
+  }
+
+  .sgWorkspace,
+  .sgWorkspace.library-collapsed {
+    width: min(100vw - 24px, 560px);
+    margin: 14px auto 88px;
+    display: block;
+    grid-template-columns: 1fr;
+  }
+
+  .sgWorkspace > .sgLibrary,
+  .sgWorkspace > .sgStudy,
+  .sgWorkspace > .sgChat {
+    display: none;
+  }
+
+  .sgWorkspace.mobile-show-files > .sgLibrary {
+    display: flex;
+  }
+
+  .sgWorkspace.mobile-show-read > .sgStudy {
+    display: flex;
+  }
+
+  .sgWorkspace.mobile-show-chat > .sgChat {
+    display: grid;
+  }
+
+  .sgLibrary {
+    position: relative;
+    top: auto;
+    height: calc(100svh - 168px);
+  }
+
+  .sgWorkspace.library-collapsed .sgLibrary {
+    align-items: center;
+  }
+
+  .sgWorkspace.library-collapsed .sgLibraryTop {
+    flex-direction: row;
+  }
+
+  .sgChat {
+    position: relative;
+    top: auto;
+    grid-column: auto;
+    height: calc(100svh - 168px);
+    min-height: 480px;
+  }
+
+  .sgStudyHeader,
+  .sgSourceStrip {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sgSourceChips {
+    width: 100%;
+  }
+
+  .sgPrimaryAction {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .sgDocument {
+    padding: 12px;
+    min-height: auto;
+    background-size: 28px 28px;
+  }
+
+  .sgMessage {
+    max-width: 96%;
+  }
+
+  .sgTabSurface {
+    width: calc(100vw - 24px);
+    margin: 14px auto 40px;
+  }
+
+  .sgMobileTabs {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 6px;
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+  }
+
+  .sgMobileTabs button {
+    height: 42px;
+    border-radius: 13px;
+    background: transparent;
+    color: var(--muted);
+    font-weight: 720;
+  }
+
+  .sgMobileTabs button.active {
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+}
+
+@media (max-width: 480px) {
+  .sgTopbar {
+    height: 58px;
+    padding: 0 12px;
+  }
+
+  .sgWorkspace,
+  .sgWorkspace.library-collapsed {
+    width: calc(100vw - 16px);
+  }
+}

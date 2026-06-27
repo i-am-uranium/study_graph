@@ -48,6 +48,15 @@ def get_session(session_id: int, db: Session = Depends(get_db)) -> QaSessionDeta
     )
 
 
+@router.delete("/sessions/{session_id}", status_code=204)
+def delete_session(session_id: int, db: Session = Depends(get_db)) -> None:
+    session = db.get(QaSession, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="QA session not found")
+    db.delete(session)
+    db.commit()
+
+
 def _session_summary(db: Session, session: QaSession) -> QaSessionRead:
     messages = _messages_for_session(db, session.id)
     last_message = messages[-1].content if messages else None
