@@ -64,6 +64,10 @@ export function ingestDocument(documentId: number): Promise<IngestionJob> {
   return request(`/api/documents/${documentId}/ingest`, { method: "POST" });
 }
 
+export function deleteDocument(documentId: number): Promise<void> {
+  return request(`/api/documents/${documentId}`, { method: "DELETE" });
+}
+
 export function listIngestionJobs(fetcher?: FetchLike): Promise<IngestionJob[]> {
   return request<IngestionJob[]>("/api/documents/ingestion-jobs", {}, fetcher);
 }
@@ -85,6 +89,10 @@ export function listQaSessions(): Promise<QaSession[]> {
 
 export function getQaSession(sessionId: number): Promise<QaSessionDetail> {
   return request(`/api/qa/sessions/${sessionId}`);
+}
+
+export function deleteQaSession(sessionId: number): Promise<void> {
+  return request(`/api/qa/sessions/${sessionId}`, { method: "DELETE" });
 }
 
 export function createSummary(documentId: number): Promise<StudyArtifact> {

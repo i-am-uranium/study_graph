@@ -1,6 +1,10 @@
 from pathlib import Path
 from uuid import uuid4
 
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models import Document, DocumentChunk, DocumentIngestionJob
@@ -11,9 +15,6 @@ from app.schemas.documents import (
     UploadResponse,
 )
 from app.services.ingestion import create_ingestion_job
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -108,6 +109,25 @@ def run_ingestion(
         return create_ingestion_job(db, document_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document(document_id: int, db: Session = Depends(get_db)) -> None:
+    document = db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Remember the stored file before the row (and its cascaded chunks/jobs) is gone.
+    stored_file = Path(document.file_path) if document.file_path else None
+    db.delete(document)
+    db.commit()
+
+    # The DB row is the source of truth; cleaning the upload is best-effort.
+    if stored_file is not None:
+        try:
+            stored_file.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 @router.get("/{document_id}/stats")
