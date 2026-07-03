@@ -6,18 +6,36 @@ StudyGraph can run locally or in production with Docker Compose. The production 
 
 Create a `.env` file on the deployment host.
 
+`POSTGRES_PASSWORD` is the only required secret. The default model stack is fully
+local, so no `OPENAI_API_KEY` is needed: the app talks to the bundled Ollama service
+over its OpenAI-compatible API via `OPENAI_BASE_URL`, with no key.
+
 ```bash
 POSTGRES_PASSWORD=replace-with-a-long-random-password
-OPENAI_API_KEY=replace-with-provider-key
-OPENAI_BASE_URL=https://api.openai.com/v1
-CHAT_MODEL=gpt-4.1-mini
-EMBEDDING_MODEL=text-embedding-3-small
+
+# Local model stack (no API key required)
+OPENAI_BASE_URL=http://ollama:11434/v1
+CHAT_MODEL=qwen3:8b
+EMBEDDING_MODEL=qwen3-embedding:0.6b
+EMBEDDING_DIMENSIONS=1024
+SEND_EMBEDDING_DIMENSIONS=false
+
+# Reranker (Infinity sidecar)
+RERANK_ENABLED=true
+RERANK_BASE_URL=http://reranker:7997
+RERANK_MODEL=BAAI/bge-reranker-v2-m3
+RETRIEVAL_CANDIDATE_K=30
+RETRIEVAL_TOP_K=8
+
 FRONTEND_ORIGINS=https://studygraph.example.com
 PUBLIC_API_BASE_URL=/api
 FRONTEND_PORT=8080
 ```
 
-Use any OpenAI-compatible provider that supports `/chat/completions` and `/embeddings`.
+By default StudyGraph runs the models locally with Ollama and the Infinity reranker,
+which requires no external credentials. To use a remote OpenAI-compatible provider
+instead, set `OPENAI_BASE_URL` to the provider endpoint and add `OPENAI_API_KEY`;
+any provider that supports `/chat/completions` and `/embeddings` works.
 
 ## Start Production Services
 
@@ -39,12 +57,16 @@ The bundled frontend Nginx proxies:
 
 ## Persistent Data
 
-Production compose creates two named volumes:
+Production compose creates named volumes:
 
 - `postgres_data`: database data, document metadata, chunks, embeddings, sessions, artifacts
 - `uploaded_files`: original uploaded documents
+- `ollama_models`: downloaded Ollama models (`qwen3:8b`, `qwen3-embedding:0.6b`)
+- `hf_cache`: reranker / Hugging Face model cache
 
-Back up both volumes. Database backups alone are not enough because the original uploaded files are stored separately.
+Back up `postgres_data` and `uploaded_files`. Database backups alone are not enough because the original uploaded files are stored separately.
+
+`ollama_models` and `hf_cache` are caches, not critical backups: they are large and can be re-downloaded on the next boot, so they do not need to be included in backups.
 
 ## Backups
 
@@ -59,9 +81,9 @@ Also snapshot or copy the `uploaded_files` Docker volume.
 
 ## Operational Notes
 
-- Keep `OPENAI_API_KEY` only in `.env` or your secret manager.
-- Restart both the API and worker after changing provider credentials. Failed documents can be ingested again after credentials are fixed.
+- The default local stack needs no provider credentials. If you use a remote provider, keep `OPENAI_API_KEY` only in `.env` or your secret manager, and restart both the API and worker after changing it. Failed documents can be ingested again afterward.
+- Do not expose the Ollama (`11434`) or reranker (`7997`) services publicly. They are internal to the compose network and should not be reachable from the internet.
 - Do not expose the API service directly unless you also configure CORS and authentication for your deployment.
 - v0.1 is designed for single-tenant or trusted deployments. Classroom multi-user roles are planned in the roadmap.
-- Embedding dimensions must match the configured embedding model before data is ingested.
+- `EMBEDDING_DIMENSIONS` is baked into the pgvector column when migrations run, and must match what the embedding model returns (`1024` for `qwen3-embedding:0.6b`). Set it before the first `alembic upgrade`; changing it later requires a migration and re-ingestion of all documents. Deployments upgrading from the old OpenAI default (`1536`) must set `EMBEDDING_DIMENSIONS=1024` before migrating and re-ingest every document, since old 1536-dim vectors are incompatible.
 - For larger libraries, tune Postgres memory and pgvector index settings.

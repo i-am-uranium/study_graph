@@ -42,11 +42,12 @@ function stubApi(
         status: 200,
         json: async () => ({
           provider: "openai-compatible",
-          base_url: "https://api.openai.com/v1",
-          chat_model: "gpt-4.1-mini",
-          embedding_model: "text-embedding-3-small",
+          base_url: "http://localhost:11434/v1",
+          chat_model: "qwen3:8b",
+          embedding_model: "qwen3-embedding:0.6b",
           api_key_configured: apiKeyConfigured,
-          embedding_dimensions: 1536,
+          provider_ready: apiKeyConfigured,
+          embedding_dimensions: 1024,
         }),
       };
     }

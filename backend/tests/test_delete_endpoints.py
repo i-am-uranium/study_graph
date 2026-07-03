@@ -31,7 +31,7 @@ def test_delete_document_removes_row_chunks_jobs_and_file(tmp_path, db_session) 
             chunk_index=0,
             text="chunk",
             source_metadata={},
-            embedding=[0.0] * 1536,
+            embedding=[0.0] * 1024,
         )
     )
     db_session.add(DocumentIngestionJob(document_id=document.id, status="completed"))

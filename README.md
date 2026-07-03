@@ -2,13 +2,14 @@
 
 StudyGraph is a local app/data agentic RAG study preparation platform. Upload PDF, DOCX, TXT, or Markdown learning materials, then ask cited questions, generate summaries, and build flashcards from your own documents.
 
-The app is designed for local development first while remaining deployable in production. Application services, uploaded files, and database data run in your environment. LLM and embedding calls use provider API keys.
+The app is designed for local development first while remaining deployable in production. The default stack is fully open-source and runs locally: application services, uploaded files, database data, and all LLM, embedding, and reranking calls run in your environment with no external API keys. A remote OpenAI-compatible provider is still optionally supported.
 
 ## Features
 
 - PDF, DOCX, TXT, and Markdown upload.
-- Local Postgres storage with pgvector.
-- Document parsing, chunking, and embedding.
+- Fully OSS, local-by-default model stack: `qwen3:8b` chat and `qwen3-embedding:0.6b` embeddings via Ollama, and `BAAI/bge-reranker-v2-m3` reranking via an Infinity server (all Apache 2.0).
+- Local Postgres storage with pgvector at 1024 dimensions.
+- Document parsing, chunking, embedding, and reranked retrieval.
 - Cited Q&A over selected documents or the full library.
 - Summaries and flashcards saved as study artifacts.
 - FastAPI backend and separate React frontend.
@@ -22,7 +23,7 @@ The app is designed for local development first while remaining deployable in pr
    cp .env.example .env
    ```
 
-2. Set `OPENAI_API_KEY` or another OpenAI-compatible provider key in `.env`.
+2. No API key is required. The default stack runs entirely locally.
 
 3. Start services:
 
@@ -30,24 +31,54 @@ The app is designed for local development first while remaining deployable in pr
    docker compose up --build
    ```
 
+   This starts Ollama, pulls the `qwen3:8b` chat and `qwen3-embedding:0.6b`
+   embedding models automatically (via the one-shot `ollama-init` service), and
+   starts the Infinity reranker. The first boot is slow because it downloads
+   several gigabytes of models; subsequent boots reuse the cached models.
+
+   > **Apple Silicon note:** the Infinity reranker image is `linux/amd64`, so on
+   > an M-series Mac it runs under emulation and is memory-hungry. Give Docker
+   > Desktop at least ~10–12 GB of RAM (Settings → Resources), or run the reranker
+   > natively on the host instead (see `scripts/pull-models.sh`). If the reranker
+   > exits with code 137 (OOM), that is the cause.
+
 4. Open the frontend:
 
    ```text
    http://localhost:5173
    ```
 
-The API is available at `http://localhost:8000`.
+The API is available at `http://localhost:8000`. Ollama runs on `11434` and the
+reranker on `7997`.
 
-If a document fails with `Provider API key is not configured`, set `OPENAI_API_KEY`
-in `.env`, restart the API and worker, then run ingestion again for that document.
+First-run model downloads can take several minutes. If a document fails to ingest
+before the models are ready, wait for the `ollama-init` service to finish, then run
+ingestion again for that document.
 
 ## Development Without Docker
+
+Models: with [Ollama](https://ollama.com) installed and running, pull the local
+models and start the reranker.
+
+```bash
+scripts/pull-models.sh
+```
+
+This pulls the `qwen3:8b` and `qwen3-embedding:0.6b` Ollama models and prints the
+Docker command for the Infinity reranker. Start the reranker with:
+
+```bash
+docker run -p 7997:7997 michaelf34/infinity:latest \
+  v2 --model-id BAAI/bge-reranker-v2-m3 --port 7997
+```
+
+Ollama serves on `11434` and the reranker on `7997`; the backend talks to both by
+default.
 
 Backend:
 
 ```bash
 cp .env.example .env
-# edit .env and set OPENAI_API_KEY
 cd backend
 python -m venv .venv
 source .venv/bin/activate

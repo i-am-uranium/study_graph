@@ -7,6 +7,7 @@ class SettingsRead(BaseModel):
     chat_model: str
     embedding_model: str
     api_key_configured: bool
+    provider_ready: bool
     embedding_dimensions: int
 
 
