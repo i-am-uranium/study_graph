@@ -1,12 +1,16 @@
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, replace
 from math import sqrt
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import Document, DocumentChunk
 from app.schemas.qa import Citation
 from app.services.providers import OpenAICompatibleProvider
+
+logger = logging.getLogger("studygraph.retrieval")
 
 
 @dataclass(frozen=True)
@@ -33,8 +37,12 @@ def retrieve_chunks(
     question: str,
     *,
     document_ids: list[int] | None = None,
-    limit: int = 8,
+    limit: int | None = None,
 ) -> list[RetrievedChunk]:
+    settings = get_settings()
+    top_k = limit if limit is not None else settings.retrieval_top_k
+    candidate_k = max(settings.retrieval_candidate_k, top_k)
+
     query_embedding = provider.embed_texts([question])[0]
     statement = select(DocumentChunk, Document).join(
         Document,
@@ -53,7 +61,40 @@ def retrieve_chunks(
         for chunk, document in candidates
     ]
     ranked.sort(key=lambda item: item.score, reverse=True)
-    return ranked[:limit]
+    pool = ranked[:candidate_k]
+
+    if settings.rerank_enabled:
+        pool = rerank_chunks(provider, question, pool)
+    return pool[:top_k]
+
+
+def rerank_chunks(
+    provider: OpenAICompatibleProvider,
+    question: str,
+    chunks: list[RetrievedChunk],
+) -> list[RetrievedChunk]:
+    """Reorder candidates with the reranker sidecar, replacing the vector score.
+
+    Falls back to the incoming vector order if the reranker is unavailable (sidecar
+    down, provider without rerank support, or a malformed response), so Q&A keeps
+    working even when reranking is degraded.
+    """
+    if not chunks:
+        return chunks
+    try:
+        results = provider.rerank(question, [item.chunk.text for item in chunks])
+    except Exception as exc:  # noqa: BLE001 - degrade gracefully, never fail the query
+        logger.warning("Reranker unavailable; using vector order", extra={"error": str(exc)})
+        return chunks
+    if not results:
+        return chunks
+
+    reordered = [
+        replace(chunks[index], score=score)
+        for index, score in results
+        if 0 <= index < len(chunks)
+    ]
+    return reordered or chunks
 
 
 def to_citations(chunks: list[RetrievedChunk]) -> list[Citation]:

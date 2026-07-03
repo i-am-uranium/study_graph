@@ -10,7 +10,7 @@ from app.services.ingestion import (
 
 class FakeProvider:
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        return [[1.0, *([0.0] * 1535)] for _ in texts]
+        return [[1.0, *([0.0] * 1023)] for _ in texts]
 
 
 def test_create_ingestion_job_tracks_document_request(db_session, tmp_path: Path) -> None:

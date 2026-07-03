@@ -26,6 +26,8 @@ Goal: make StudyGraph useful from a cloned repository.
 
 Goal: improve trust, retrieval quality, and developer confidence.
 
+Detailed implementation plan: [v0.2-quality-rag-plan.md](v0.2-quality-rag-plan.md).
+
 - Stronger reranking.
 - Better context verification.
 - Citation coverage scoring.

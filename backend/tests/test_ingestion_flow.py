@@ -7,7 +7,7 @@ from app.services.ingestion import ingest_document
 
 class FakeProvider:
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        return [[float(index + 1), *([0.0] * 1535)] for index, _ in enumerate(texts)]
+        return [[float(index + 1), *([0.0] * 1023)] for index, _ in enumerate(texts)]
 
     def chat(self, system_prompt: str, user_prompt: str, *, expect_json: bool = False) -> str:
         if expect_json:

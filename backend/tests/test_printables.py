@@ -26,7 +26,7 @@ from app.services.printables import (
 
 class FakeProvider:
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        return [[1.0, *([0.0] * 1535)] for _ in texts]
+        return [[1.0, *([0.0] * 1023)] for _ in texts]
 
     def chat(self, system_prompt: str, user_prompt: str, *, expect_json: bool = False) -> str:
         return """

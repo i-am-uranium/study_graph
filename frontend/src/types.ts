@@ -92,6 +92,7 @@ export interface SettingsRead {
   chat_model: string;
   embedding_model: string;
   api_key_configured: boolean;
+  provider_ready: boolean;
   embedding_dimensions: number;
 }
 

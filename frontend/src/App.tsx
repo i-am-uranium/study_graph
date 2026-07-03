@@ -662,7 +662,7 @@ export default function App() {
   }
 
   async function onIngest(documentId: number) {
-    if (!settings?.api_key_configured) {
+    if (!settings?.provider_ready) {
       setError("Learning support is not connected yet. Open Settings to finish setup.");
       return;
     }
@@ -695,7 +695,7 @@ export default function App() {
       setError("Upload your own material before asking about it.");
       return;
     }
-    if (!settings?.api_key_configured) {
+    if (!settings?.provider_ready) {
       setError("Learning support is not connected yet. Open Settings to finish setup.");
       return;
     }
@@ -838,7 +838,7 @@ export default function App() {
       return;
     }
 
-    if (!settings?.api_key_configured) {
+    if (!settings?.provider_ready) {
       setError("Learning support is not connected yet. Open Settings to finish setup.");
       return;
     }
@@ -861,7 +861,7 @@ export default function App() {
 
   async function onCreatePrintable(event: FormEvent) {
     event.preventDefault();
-    if (!settings?.api_key_configured) {
+    if (!settings?.provider_ready) {
       setError("Learning support is not connected yet. Open Settings to finish setup.");
       return;
     }
@@ -1034,7 +1034,7 @@ export default function App() {
     () => artifacts.find((artifact) => artifact.id === readerArtifactId) ?? null,
     [artifacts, readerArtifactId],
   );
-  const providerReady = settings?.api_key_configured === true;
+  const providerReady = settings?.provider_ready === true;
   const providerMissing = settings !== null && !providerReady;
   const providerSetupMessage = "Connect learning support before using this action.";
   const connectionMissing = error === "StudyGraph is not connected. Start StudyGraph, then refresh.";
@@ -2619,8 +2619,8 @@ export default function App() {
                   </div>
                   <dl className="readinessList">
                     <dt>Status</dt>
-                    <dd className={settings?.api_key_configured ? "configured" : "missing"}>
-                      {settings?.api_key_configured ? "Connected" : "Not connected"}
+                    <dd className={settings?.provider_ready ? "configured" : "missing"}>
+                      {settings?.provider_ready ? "Connected" : "Not connected"}
                     </dd>
                     <dt>Answers</dt>
                     <dd>{settings?.chat_model ?? "Not available"}</dd>
@@ -2629,9 +2629,9 @@ export default function App() {
                   </dl>
                   <div className="readinessPulse" aria-label="Workspace readiness summary">
                     <div>
-                      <strong>{settings?.api_key_configured ? "Ready" : "Needs setup"}</strong>
+                      <strong>{settings?.provider_ready ? "Ready" : "Needs setup"}</strong>
                       <span>
-                        {settings?.api_key_configured
+                        {settings?.provider_ready
                           ? "Answers, study sets, and papers can use prepared material."
                           : "Connect the learning engine to unlock answers and generated outputs."}
                       </span>
